@@ -1,0 +1,99 @@
+#include "printk.h"
+#include "sbi.h"
+
+int put_num(uint64 num, int base)
+{
+    char buffer[24] = {0};
+    uint64 c=num;
+    int cnt = 1;
+    int i;
+    if(c) {
+        cnt--;
+        while(c)
+        {
+            cnt++;
+            c /= base;
+        }
+    }
+    if(cnt > 24)
+    {
+        puts("<error num>");
+    }
+    i = cnt-1;
+    do {
+        c = num % base;
+        if(c>9) c = c - 10 + 'A';
+        else c = c + '0';
+        buffer[i--] = c;
+        num /= base;
+    } while(num);
+    for(i=0;i<cnt;i++)
+    {
+        putc(buffer[i]);
+    }
+    return cnt;
+}
+
+static int vprintf(const char *fmt, va_list ap) 
+{
+    int cnt = 0;
+	for(; *fmt != '\0'; fmt++)
+	{
+		if (*fmt != '%') {
+			if(*fmt != '\n' && *fmt != '\t')
+            	cnt++;
+			putc(*fmt);            
+			continue;   		
+		}
+		fmt++;
+		
+		switch (*fmt) {
+            case 'l':
+                if(*(fmt+1)=='d')
+                {
+                    fmt++;
+                    cnt+=put_num(va_arg(ap, int64), 10);
+                } else if(*(fmt+1)=='o')
+                {
+                    fmt++;
+                    cnt+=put_num(va_arg(ap, uint64), 8);
+                } else if(*(fmt+1)=='u')
+                {
+                    fmt++;
+                    cnt+=put_num(va_arg(ap, uint64), 10);
+                } else if(*(fmt+1)=='x')
+                {
+                    fmt++;
+                    cnt+=put_num(va_arg(ap, uint64), 16);
+                } else
+                {
+                    putc('%');
+                    putc(*fmt);
+                    if(*fmt != '\n' && *fmt != '\t')
+                        cnt++;
+                }
+                break;
+            case 'd': cnt+=put_num(va_arg(ap, int), 10); break;
+            case 'o': cnt+=put_num(va_arg(ap, unsigned int), 8); break;				
+            case 'u': cnt+=put_num(va_arg(ap, unsigned int), 10); break;
+            case 'x': cnt+=put_num(va_arg(ap, unsigned int), 16); break;
+            case 'c': putc((char)va_arg(ap, int)); cnt++; break;
+            case 's': cnt+=puts(va_arg(ap, char *)); break;     
+            default:  
+                putc(*fmt);
+				if(*fmt != '\n' && *fmt != '\t')
+                	cnt++;
+                break;
+		}
+	}
+	return cnt;
+}
+
+int printk(const char *fmt, ...) 
+{
+	va_list ap;
+	va_start(ap, fmt);
+	int ret = vprintf(fmt, ap);
+	va_end(ap);
+	return ret;
+}

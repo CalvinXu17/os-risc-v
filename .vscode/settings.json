@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "sbi.h": "c",
+        "page.h": "c",
+        "slob.h": "c"
+    }
+}

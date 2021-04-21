@@ -1,0 +1,11 @@
+AS	= riscv64-unknown-elf-as
+LD	= riscv64-unknown-elf-ld
+CC	= riscv64-unknown-elf-gcc
+
+AR	= riscv64-unknown-elf-ar
+NM  = riscv64-unknown-elf-nm
+OBJCOPY = riscv64-unknown-elf-objcopy
+STRIP = riscv64-unknown-elf-strip
+
+LDFLAGS = -m elf64lriscv
+CFLAGS  = -mcmodel=medany
