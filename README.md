@@ -1,2 +1,2 @@
 # os-risc-v
-os on risc-v
+Shanghai Ocean University
