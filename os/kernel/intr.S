@@ -1,6 +1,5 @@
 .macro PUSH_ALL
     csrrw a0, sscratch, a0 # scratch保存指向cpu结构体的指针，a0与scratch交换
-
     sd ra, 0*8(a0)
     sd sp, 1*8(a0)
     sd gp, 2*8(a0)
@@ -88,7 +87,7 @@
     ld t4, 28*8(a0)
     ld t5, 29*8(a0)
     ld t6, 30*8(a0)
-    ld a0, 9*8(a0) # 最后再恢复sp
+    ld a0, 9*8(a0) # 最后再恢复a0
 .endm
 
 .globl trap_entry, trap_ret
