@@ -1,6 +1,5 @@
 .macro PUSH_ALL
     csrrw a0, sscratch, a0 # scratch保存指向cpu结构体的指针，a0与scratch交换
-    # addi sp, sp, -37*8  # 此时sp切换为内核栈，栈开辟新空间，而scratch保存的是原sp
 
     sd ra, 0*8(a0)
     sd sp, 1*8(a0)
@@ -93,7 +92,7 @@
 .endm
 
 .globl trap_entry, trap_ret
-# 入口地址必须二字节对齐
+# 入口地址必须低2位对齐
 .align(2)
 trap_entry:
     PUSH_ALL
