@@ -40,8 +40,6 @@ struct trap_context
     
     uint64 sstatus;
     uint64 sepc;
-    uint64 k_sp;
-    uint64 satp;
     uint64 sbadvaddr;
     uint64 scause;
 };
@@ -81,5 +79,6 @@ static inline void intr_close(void)
     sstatus &= 0xfffffffffffffffd; // 1101
     set_sstatus(sstatus);
 }
+void intr_init(void);
 
 #endif

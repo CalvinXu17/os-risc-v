@@ -13,7 +13,7 @@ void timer_init(uint64 stime_value)
     set_sie(sie);
 }
 
-void timer_handler(struct trap_context *p)
+void timer_handler(cpu *p)
 {
     sbi_set_timer(get_time() + tbase); // 设置下一次中断事件
 

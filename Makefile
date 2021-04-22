@@ -15,10 +15,11 @@ buildos:
 	$(CC) $(CFLAGS) -c -O2 -o $(BUILD)panic.o ./os/kernel/panic.c
 	$(CC) $(CFLAGS) -c -o $(BUILD)printk.o ./os/kernel/printk.c
 	$(CC) $(CFLAGS) -c -O2 -o $(BUILD)start.o ./os/kernel/start.c
+	$(CC) $(CFLAGS) -c -O2 -o $(BUILD)cpu.o ./os/kernel/cpu.c
 	$(CC) $(CFLAGS) -c -O2 -o $(BUILD)page.o ./os/kernel/page.c
 	$(CC) $(CFLAGS) -c -O2 -o $(BUILD)slob.o ./os/kernel/slob.c
 	$(CC) $(CFLAGS) -c -O2 -o $(BUILD)kmalloc.o ./os/kernel/kmalloc.c
-	$(LD) $(LDFLAGS) -o $(BUILD)kernel $(BUILD)boot.o $(BUILD)start.o $(BUILD)panic.o $(BUILD)printk.o $(BUILD)intr_s.o $(BUILD)intr.o $(BUILD)timer.o $(BUILD)page.o $(BUILD)slob.o $(BUILD)kmalloc.o
+	$(LD) $(LDFLAGS) -o $(BUILD)kernel $(BUILD)boot.o $(BUILD)start.o $(BUILD)cpu.o $(BUILD)panic.o $(BUILD)printk.o $(BUILD)intr_s.o $(BUILD)intr.o $(BUILD)timer.o $(BUILD)page.o $(BUILD)slob.o $(BUILD)kmalloc.o
 	$(OBJCOPY) $(BUILD)kernel --strip-all -O binary $(BUILD)kernel.bin
 	$(NM) $(BUILD)/kernel | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > ./kernel.map
 

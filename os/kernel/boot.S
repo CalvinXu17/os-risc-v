@@ -1,10 +1,12 @@
     .section .text.entry
-    .globl k_entry, kernel_stack, kernel_stack_top
-mhartnum = 1
+    .globl k_entry, boot_stack, boot_stack_top
+mhartnum = 2
 pv_offset = 0xFFFFFFFF00000000
 
 k_entry: # 0x80200000
-    la t4, kstart
+    la a0, boot_hartid
+    li a1, 1
+    amoadd.w a0, a1, (a0) # t=(a0),(a0)=t+a1,a0=t
     lui t0, %hi(k_pg_t)
     li t1, pv_offset
     sub t0, t0, t1
@@ -13,24 +15,26 @@ k_entry: # 0x80200000
     or t0, t0, t2
     csrw satp, t0
     sfence.vma
-
     lui t0, %hi(go)
     addi t0, t0, %lo(go)
     jr t0
 go:
-    la sp, kernel_stack_top
-    csrw sscratch, sp
+    la sp, boot_stack
+    li t0, 4096
+    mv t1, a0 # t1=hartid
+    addi t1, t1, 1
+    mul t0, t0, t1
+    add sp, sp, t0
     la t0, kstart
-    mv a0, t4
     jr t0
 loop:
     j loop
 
 .section .data
 .align 12
-kernel_stack:
+boot_stack:
     .zero 4096 * 8 * mhartnum
-kernel_stack_top:
+boot_stack_top:
 
 .globl k_pg_t
 .section .data
@@ -41,3 +45,5 @@ k_pg_t: # 0xffff ffff 8000 0000 - 0x8000 0000
     # 此时该页表为叶页表为1G大的超级页面
     .quad (0x80000 << 10) | 0xcf # VRWXAD
     .zero 8
+boot_hartid:
+    .word 0

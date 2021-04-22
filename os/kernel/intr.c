@@ -14,9 +14,9 @@ void intr_init(void)
 }
 
 int64 cnt=1;
-void intr_handler(struct trap_context *p)
+void intr_handler(cpu *p)
 {
-    uint64 cause = (p->scause << 1) >> 1; // 最高位置0
+    uint64 cause = (p->context.scause << 1) >> 1; // 最高位置0
     switch (cause)
     {
     case INT_S_SOFT:
@@ -43,9 +43,9 @@ void intr_handler(struct trap_context *p)
     }
 }
 
-void exception_handler(struct trap_context *p)
+void exception_handler(cpu *p)
 {
-    switch (p->scause)
+    switch (p->context.scause)
     {
     case EXCPT_MISALIGNED_INST:
         break;
@@ -80,14 +80,16 @@ void exception_handler(struct trap_context *p)
     }
 }
 
-void trap_handler(struct trap_context *p)
+void trap_handler(cpu *p)
 {
-    if(((int64)(p->scause)) < 0) // scause最高位为1为中断，0为异常
+    p->intrdepth++; // 记录中断层数
+    printk("trap depth: %ld\n", p->intrdepth);
+    if(((int64)(p->context.scause)) < 0) // scause最高位为1为中断，0为异常
     {
         intr_handler(p);
     } else
     {
         exception_handler(p);    
     }
-
+    p->intrdepth--;
 }
