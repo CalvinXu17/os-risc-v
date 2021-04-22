@@ -1,5 +1,8 @@
 #include "printk.h"
 #include "sbi.h"
+#include "spinlock.h"
+
+spinlock printk_lock = {"printk_lock", 0, 0};
 
 int put_num(uint64 num, int base)
 {
@@ -91,9 +94,11 @@ static int vprintf(const char *fmt, va_list ap)
 
 int printk(const char *fmt, ...) 
 {
+    lock(&printk_lock);
 	va_list ap;
 	va_start(ap, fmt);
 	int ret = vprintf(fmt, ap);
 	va_end(ap);
+    unlock(&printk_lock);
 	return ret;
 }

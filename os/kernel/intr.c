@@ -82,8 +82,7 @@ void exception_handler(cpu *p)
 
 void trap_handler(cpu *p)
 {
-    p->intrdepth++; // 记录中断层数
-    printk("trap depth: %ld\n", p->intrdepth);
+    printk("hartid: %ld\n", gethartid(p));
     if(((int64)(p->context.scause)) < 0) // scause最高位为1为中断，0为异常
     {
         intr_handler(p);
@@ -91,5 +90,4 @@ void trap_handler(cpu *p)
     {
         exception_handler(p);    
     }
-    p->intrdepth--;
 }

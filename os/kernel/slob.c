@@ -1,9 +1,12 @@
 #include "slob.h"
 #include "page.h"
+#include "spinlock.h"
 
 small_block free_small_blocks = {.unit_n=1, .next=&free_small_blocks};
 small_block *p_free_small_blocks = &free_small_blocks;
 big_block *p_big_blocks = 0;
+
+spinlock mm_lock = {"mm_lock", 0, 0};
 
 void* slob_get_pages(uint64 page_n)
 {
@@ -24,7 +27,7 @@ void* small_alloc(uint64 size) // 分配小内存
     pre = p_free_small_blocks;
     p = pre->next;
 
-    // spin_lock_irqsave(&slob_lock, 0);
+    lock(&mm_lock);
     for( ; ;pre=p, p=p->next)
     {
         if(p->unit_n >= unit_n)
@@ -39,17 +42,23 @@ void* small_alloc(uint64 size) // 分配小内存
 			}
 
 			p_free_small_blocks = pre;
-			 // spin_unlock_irqrestore(&slob_lock, 0);
+
+			unlock(&mm_lock);
+			
 			return p;
         }
         if(p == p_free_small_blocks) // 未找到合适的则申请新的一页内存
         {
 			p = (small_block *)slob_get_pages(1);
-            // spin_unlock_irqrestore(&slob_lock, 0);
+
+            unlock(&mm_lock);
+
 			if (!p)
 				return 0;
 			small_free(p, PAGE_SIZE);
-			// spin_lock_irqsave(&slob_lock, 0);
+
+			lock(&mm_lock);
+
 			p = p_free_small_blocks;
         }
     }
@@ -65,7 +74,7 @@ void small_free(void *block, uint64 size)
 	if (size)
 		q->unit_n = get_unit_n(size);
 
-	// spin_lock_irqsave(&slob_lock, 0);
+	lock(&mm_lock);
 
     // 找到q在p与p->next之间
 	for (p = p_free_small_blocks; !(q > p && q < p->next); p = p->next)
@@ -88,5 +97,5 @@ void small_free(void *block, uint64 size)
 
 	p_free_small_blocks = p;
 
-	// spin_unlock_irqrestore(&slob_lock, 0);
+	unlock(&mm_lock);
 }

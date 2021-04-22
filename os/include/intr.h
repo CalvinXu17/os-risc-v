@@ -79,6 +79,15 @@ static inline void intr_close(void)
     sstatus &= 0xfffffffffffffffd; // 1101
     set_sstatus(sstatus);
 }
+
+static inline uint64 is_intr_open(void)
+{
+    uint64 sstatus = get_sstatus();
+    sstatus >>= 1;
+    sstatus &= 0x1;
+    return sstatus;
+}
+
 void intr_init(void);
 
 #endif

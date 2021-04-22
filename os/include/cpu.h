@@ -291,13 +291,14 @@ typedef struct _cpu
 {
     struct trap_context context;
     void* k_sp;
-    uint64 intrenable;
-    uint64 intrdepth;
+    uint64 old_intr;
+    uint64 locks_n;
 } cpu;
 
 extern cpu cpus[CPU_N];
 
 cpu* getcpu(void);
 uint64 gethartid(cpu *p);
-void cpu_init(cpu *p);
+void cpu_init(uint64 hartid);
+
 #endif

@@ -6,7 +6,8 @@ pv_offset = 0xFFFFFFFF00000000
 k_entry: # 0x80200000
     la a0, boot_hartid
     li a1, 1
-    amoadd.w a0, a1, (a0) # t=(a0),(a0)=t+a1,a0=t
+    amoadd.w a0, a1, (a0) # t=(a0),(a0)=t+a1,a0=t 通过原子操作软获取hartid存至a0
+
     lui t0, %hi(k_pg_t)
     li t1, pv_offset
     sub t0, t0, t1
@@ -47,3 +48,5 @@ k_pg_t: # 0xffff ffff 8000 0000 - 0x8000 0000
     .zero 8
 boot_hartid:
     .word 0
+mask:
+    .quad 2
