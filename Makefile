@@ -45,5 +45,4 @@ k210: buildos
 clean:
 	rm -f ./build/*.o
 cleanx:
-	rm -f ./build/*
-	touch ./build/.gitignore
+	rm -fr !(.gitignore)
