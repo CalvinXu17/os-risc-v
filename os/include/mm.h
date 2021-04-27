@@ -10,7 +10,14 @@
 #define VM_START (PM_START+PV_OFFSET)
 #define VM_END   (VM_START+PM_SIZE)
 
-#define KERNEL_PM_START 0x80200000
+#ifdef _QEMU
+#define K_OFFSET 0x200000
+#endif
+#ifdef _K210
+#define K_OFFSET 0x20000
+#endif
+
+#define KERNEL_PM_START (PM_START+K_OFFSET)
 #define KERNEL_VM_START (KERNEL_PM_START+PV_OFFSET)
 
 #endif

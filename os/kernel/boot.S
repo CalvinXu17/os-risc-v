@@ -3,21 +3,20 @@
 mhartnum = 2
 pv_offset = 0xFFFFFFFF00000000
 
-k_entry: # 0x80200000
+k_entry: # 0x80020000
     la a0, boot_hartid
     li a1, 1
     amoadd.w a0, a1, (a0) # t=(a0),(a0)=t+a1,a0=t 通过原子操作软获取hartid存至a0
 
-    lui t0, %hi(k_pg_t)
-    li t1, pv_offset
-    sub t0, t0, t1
+    la t0, k_pg_t
     srli t0, t0, 12
-    li t2, 8<<60
-    or t0, t0, t2
+    li t1, 8<<60
+    or t0, t0, t1
     csrw satp, t0
     sfence.vma
-    lui t0, %hi(go)
-    addi t0, t0, %lo(go)
+    la t0, go
+    li t1, pv_offset
+    add t0, t0, t1
     jr t0
 go:
     la sp, boot_stack
@@ -41,7 +40,10 @@ boot_stack_top:
 .section .data
 .align 12
 k_pg_t: # 0xffff ffff 8000 0000 - 0x8000 0000
-    .zero 8 * 510
+    .quad (0x00000 << 10) | 0xcf
+    .quad (0x40000 << 10) | 0xcf
+    .quad (0x80000 << 10) | 0xcf
+    .zero 8 * 507
     # 设置倒数第二个个页表项，PPN=0x80000，标志位 VRWXAD 均为 1
     # 此时该页表为叶页表为1G大的超级页面
     .quad (0x80000 << 10) | 0xcf # VRWXAD

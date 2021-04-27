@@ -24,7 +24,7 @@ void page_init(void)
 
     printk("aligned kernel size: 0x%lx\n", k_size);
     int i;
-    for(i=0;i<(k_size >> 12);i++)  // 初始化内核所占的页面
+    for(i=0;i<(k_size >> 12)+(K_OFFSET>>12);i++)  // 初始化sbi以及内核所占的页面
     {
         pages_map[i].flag = PAGE_RESERVE;
         pages_map[i].ref_cnt = 1;

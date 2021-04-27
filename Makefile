@@ -3,9 +3,13 @@ include Makefile.header
 BUILD = ./build/
 INC = ./os/include
 
-LDFLAGS += -nostdlib --gc-sections -T ./link.ld
+LDFLAGS += -nostdlib --gc-sections
 CFLAGS += -fno-builtin -nostdlib -fno-stack-protector -ffunction-sections -fdata-sections -Wall # -O
-CFLAGS += -I$(INC) -D_QEMU
+CFLAGS += -I$(INC)
+qemu: CFLAGS += -D_QEMU
+qemu: LDFLAGS += -T ./qemu.ld
+k210: CFLAGS += -D_K210
+k210: LDFLAGS += -T ./k210.ld
 
 buildos:
 	$(AS) -o $(BUILD)boot.o ./os/kernel/boot.S
@@ -24,7 +28,7 @@ buildos:
 	$(OBJCOPY) $(BUILD)kernel --strip-all -O binary $(BUILD)kernel.bin
 	$(NM) $(BUILD)/kernel | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > ./kernel.map
 
-run: buildos
+qemu: buildos
 	qemu-system-riscv64 -machine virt \
 				-smp 2 \
 				-m 8M \
