@@ -46,3 +46,4 @@ clean:
 	rm -f ./build/*.o
 cleanx:
 	rm -f ./build/*
+	touch ./build/.gitignore
