@@ -39,6 +39,7 @@
     # 以上三项异常返回时可被修改，用于实现切换
     csrr s3, sbadaddr
     csrr s4, scause
+    csrr s5, stval
     
     sd s0, 9*8(a0) # 保存原a0
 
@@ -46,6 +47,7 @@
     sd s2, 32*8(a0)
     sd s3, 33*8(a0)
     sd s4, 34*8(a0)
+    sd s5, 35*8(a0)
 .endm
 .macro POP_ALL
     # 先恢复状态寄存器，用于切换进程
@@ -95,7 +97,7 @@
 .align(2)
 trap_entry:
     PUSH_ALL
-    ld sp, 35*8(a0) # 加载内核栈
+    ld sp, 36*8(a0) # 加载内核栈
     call trap_handler
 trap_ret:
     POP_ALL

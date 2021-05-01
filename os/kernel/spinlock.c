@@ -40,3 +40,8 @@ void unlock(spinlock *lock)
     if(!cur_cpu->locks_n && cur_cpu->old_intr)
         intr_open();
 }
+
+int ishold(spinlock *lock)
+{
+    return lock->islocked && lock->owner==getcpu();
+}

@@ -2,6 +2,7 @@
 #define PRINTK_H
 
 #include "sbi.h"
+#include "console.h"
 
 typedef __builtin_va_list va_list;
 #define va_start(ap, last)      (__builtin_va_start(ap, last))
@@ -10,7 +11,7 @@ typedef __builtin_va_list va_list;
 
 static inline void putc(char ch)
 {
-    sbi_console_putchar(ch);
+    console_putc(ch);
 }
 
 static inline int puts(const char *s)

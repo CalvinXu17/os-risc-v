@@ -17,19 +17,19 @@
 // }
 
 // // machine mode
-// static inline uint64 get_mtval(void)
-// {
-//     uint64 rt;
-//     asm volatile("csrr %0, mtval" : "=r"(rt));
-//     return rt;
-// }
+static inline uint64 get_mtval(void)
+{
+    uint64 rt;
+    asm volatile("csrr %0, mtval" : "=r"(rt));
+    return rt;
+}
 
-// static inline uint64 get_mcause(void)
-// {
-//     uint64 rt;
-//     asm volatile("csrr %0, mcause" : "=r"(rt));
-//     return rt;
-// }
+static inline uint64 get_mcause(void)
+{
+    uint64 rt;
+    asm volatile("csrr %0, mcause" : "=r"(rt));
+    return rt;
+}
 
 // static inline uint64 get_mstatus(void)
 // {
@@ -204,6 +204,20 @@ static inline uint64 get_sie(void)
 static inline void set_sie(uint64 x)
 {
     asm volatile("csrw sie, %0"
+                 : 
+                 : "r"(x));
+}
+
+static inline uint64 get_sip(void)
+{
+    uint64 rt;
+    asm volatile("csrr %0, sip" : "=r"(rt));
+    return rt;
+}
+
+static inline void set_sip(uint64 x)
+{
+    asm volatile("csrw sip, %0"
                  : 
                  : "r"(x));
 }

@@ -42,6 +42,7 @@ struct trap_context
     uint64 sepc;
     uint64 sbadvaddr;
     uint64 scause;
+    uint64 stval;
 };
 
 #define INT_S_SOFT       1

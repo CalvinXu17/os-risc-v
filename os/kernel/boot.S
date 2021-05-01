@@ -43,11 +43,13 @@ k_pg_t: # 0xffff ffff 8000 0000 - 0x8000 0000
     .quad (0x00000 << 10) | 0xcf
     .quad (0x40000 << 10) | 0xcf
     .quad (0x80000 << 10) | 0xcf
-    .zero 8 * 507
+    .zero 8 * 505
     # 设置倒数第二个个页表项，PPN=0x80000，标志位 VRWXAD 均为 1
     # 此时该页表为叶页表为1G大的超级页面
+    .quad (0x00000 << 10) | 0xcf
+    .quad (0x40000 << 10) | 0xcf
     .quad (0x80000 << 10) | 0xcf # VRWXAD
-    .zero 8
+    .quad 0
 boot_hartid:
     .word 0
 mask:

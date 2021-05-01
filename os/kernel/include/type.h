@@ -5,8 +5,11 @@ typedef unsigned int        uint;
 typedef unsigned short      ushort;
 typedef unsigned char       uchar;
 typedef unsigned int        uint32;
-typedef unsigned long long  uint64;
+typedef unsigned long int   uint64;
 typedef int                 int32;
-typedef long long           int64;
+typedef long int            int64;
+
+typedef unsigned short      uint16;
+typedef short               int16;
 
 #endif

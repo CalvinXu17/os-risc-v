@@ -3,10 +3,20 @@
 #include "sbi.h"
 #include "kmalloc.h"
 #include "page.h"
+#include "plic.h"
+#include "console.h"
+#include "fpioa.h"
+#include "sdcard_test.h"
+#include "disk.h"
+#include "fat32.h"
 
 extern void intr_init(void);
 
 static volatile init_done = 0;
+
+extern uint64 k_pg_t[512];
+
+extern struct disk dsk;
 
 void kstart(uint64 hartid)
 {
@@ -16,53 +26,32 @@ void kstart(uint64 hartid)
     {
         printk("os init...\n");
         page_init();
+        console_init();
+        // plicinit();
+        fpioa_pin_init();
+
+        if(!sdcard_init())
+        {
+            printk("sdcard init success\n");
+            disk_init(&dsk);
+            fat32_init(&dsk);
+            
+        } else printk("sdcard init failed\n");
+
         for(int i=1;i < CPU_N; i++)
         {
             uint64 mask = 1 << i;
             sbi_send_ipi(&mask); // 启动其他的核
         }
+        __sync_synchronize();
         init_done = 1;
     }
-
     while(!init_done) {}
-    Page *p1,*p2,*p3;
+    __sync_synchronize();
 
-    p1 = alloc_pages(1);
-    p2 = alloc_pages(2);
-    p3 = alloc_pages(3);
-    printk("%d: page1 vm: 0x%lx\n", hartid, get_vm_addr_by_page(p1));
-    printk("%d: page2 vm: 0x%lx\n", hartid, get_vm_addr_by_page(p2));
-    printk("%d: page3 vm: 0x%lx\n", hartid, get_vm_addr_by_page(p3));
-
-    free_pages(p3, 3);
-    free_pages(p1, 1);
-    free_pages(p2, 2);
-        
-
-    p1 = alloc_pages(1);
-    printk("%d: page1 vm: 0x%lx\n", hartid, get_vm_addr_by_page(p1));
-    free_pages(p1, 1);
-
-
-    void *p = kmalloc(4096);
-    printk("%d: p: 0x%lx\n", hartid, p);
-    kfree(p);
-    p = kmalloc(4096);
-    printk("%d: p: 0x%lx\n", hartid, p);
-    kfree(p);
-
-    p = kmalloc(4);
-    printk("%d: p: 0x%lx\n", hartid, p);
-    kfree(p);
-    p = kmalloc(8);
-    printk("%d: p: 0x%lx\n", hartid, p);
-    kfree(p);
-
-    p = kmalloc(4096);
-    printk("%d: p: 0x%lx\n", hartid, p);
-    kfree(p);
-    
+    //plicinithart();
     intr_init();
+    
     printk("os init success\n");
     while(1)
     {

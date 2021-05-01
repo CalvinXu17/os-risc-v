@@ -11,7 +11,9 @@ typedef struct _spinlock
     cpu *owner;
 }spinlock;
 
+void init_spinlock(spinlock *lock, char *name);
 void lock(spinlock *lock);
 void unlock(spinlock *lock);
+int ishold(spinlock *lock);
 
 #endif

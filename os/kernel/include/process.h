@@ -52,13 +52,13 @@ typedef struct _proc_context
 
 typedef struct _Process
 {
-    int32 pid;
-    int32 status;
-
+    uint64 k_sp;
+    uint64 *k_stack;
     uint64 *pg_t;
     proc_context context;
-    uint64 *k_stack;
-    uint64 k_sp;
+    
+    int32 pid;
+    int32 status;
 
     int64 t_wait;
     int64 t_slice;

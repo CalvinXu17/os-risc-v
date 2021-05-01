@@ -4,11 +4,12 @@
 
 spinlock printk_lock = {"printk_lock", 0, 0};
 
-int put_num(uint64 num, int base)
+int put_unum(uint64 num, int base)
 {
-    char buffer[24] = {0};
-    uint64 c=num;
     int cnt = 1;
+    char buffer[24] = {0};
+    uint64 c= num;
+    
     int i;
     if(c) {
         cnt--;
@@ -34,6 +35,20 @@ int put_num(uint64 num, int base)
     {
         putc(buffer[i]);
     }
+    return cnt;
+}
+
+int put_num(uint64 num, int base)
+{
+    int cnt = 1;
+    if(((int64)num) < 0)
+    {
+        putc('-');
+        cnt++;
+        num = num - 1;
+        num = ~num; // 负数补码转正数
+    }
+    cnt += put_unum(num, base);
     return cnt;
 }
 
@@ -67,7 +82,7 @@ static int vprintf(const char *fmt, va_list ap)
                 } else if(*(fmt+1)=='x')
                 {
                     fmt++;
-                    cnt+=put_num(va_arg(ap, uint64), 16);
+                    cnt+=put_unum(va_arg(ap, uint64), 16);
                 } else
                 {
                     putc('%');
@@ -79,7 +94,7 @@ static int vprintf(const char *fmt, va_list ap)
             case 'd': cnt+=put_num(va_arg(ap, int), 10); break;
             case 'o': cnt+=put_num(va_arg(ap, unsigned int), 8); break;				
             case 'u': cnt+=put_num(va_arg(ap, unsigned int), 10); break;
-            case 'x': cnt+=put_num(va_arg(ap, unsigned int), 16); break;
+            case 'x': cnt+=put_unum(va_arg(ap, unsigned int), 16); break;
             case 'c': putc((char)va_arg(ap, int)); cnt++; break;
             case 's': cnt+=puts(va_arg(ap, char *)); break;     
             default:  

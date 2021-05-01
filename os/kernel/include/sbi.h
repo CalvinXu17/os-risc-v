@@ -115,4 +115,9 @@ static inline void sbi_set_extern_interrupt(uint64 func_point)
 {
     sbi_ecall(0x0A000004, 0x210, func_point, 0, 0, 0);
 }
+
+static inline void sbi_set_mie(void) {
+	sbi_ecall(0x0A000005, 0, 0, 0, 0, 0);
+}
+
 #endif
