@@ -287,12 +287,14 @@ static inline void set_tp(uint64 x)
 }
 
 #include "intr.h"
+#include "process.h"
 typedef struct _cpu
 {
     struct trap_context context;
     void* k_sp;
     uint64 old_intr;
     uint64 locks_n;
+    Process *cur_proc;
 } cpu;
 
 extern cpu cpus[CPU_N];

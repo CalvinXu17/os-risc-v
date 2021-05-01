@@ -9,11 +9,12 @@ extern void trap_entry(void);
 void intr_init(void)
 {
     set_stvec((uint64)trap_entry);
+    printk("timer frequence: %ld\n", TIMER_FRQ);
     timer_init(TIMER_FRQ);
     intr_open();
 }
 
-int64 cnt=1;
+int64 cnt[CPU_N]={[0 ... CPU_N-1]=1};
 void intr_handler(cpu *p)
 {
     uint64 cause = (p->context.scause << 1) >> 1; // 最高位置0
@@ -27,7 +28,7 @@ void intr_handler(cpu *p)
         break;
     case INT_S_TIMER:
         timer_handler(p);
-        printk("INT_S_TIMER %ld\n", cnt++);
+        printk("INT_S_TIMER %ld\n", cnt[gethartid(p)]++);
         break;
     case INT_M_TIMER:
         printk("INT_M_TIMER\n");
@@ -82,7 +83,7 @@ void exception_handler(cpu *p)
 
 void trap_handler(cpu *p)
 {
-    printk("hartid: %ld\n", gethartid(p));
+    printk("hartid: %ld ", gethartid(p));
     if(((int64)(p->context.scause)) < 0) // scause最高位为1为中断，0为异常
     {
         intr_handler(p);

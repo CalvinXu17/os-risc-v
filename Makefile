@@ -1,7 +1,7 @@
 include Makefile.header
 
 BUILD = ./build/
-INC = ./os/include
+INC = ./os/kernel/include
 
 LDFLAGS += -nostdlib --gc-sections
 CFLAGS += -fno-builtin -nostdlib -fno-stack-protector -ffunction-sections -fdata-sections -Wall # -O
@@ -41,7 +41,7 @@ k210: buildos
 	cp ./sbi/k210/rustsbi-k210.bin ./build/k210.bin
 	dd if=./build/kernel.bin of=./build/k210.bin bs=128k seek=1
 	cp ./build/k210.bin /mnt/c/Users/Calvin/Desktop/k210.bin
-
+	powershell.exe C:/Users/Calvin/Desktop/run.bat
 clean:
 	rm -f ./build/*.o
 cleanx:
