@@ -98,6 +98,7 @@
 trap_entry:
     PUSH_ALL
     ld sp, 36*8(a0) # 加载内核栈
+    ld tp, 37*8(a0) # 设置好hartid
     call trap_handler
 trap_ret:
     POP_ALL

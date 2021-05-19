@@ -67,4 +67,6 @@ static inline uint64 get_vm_addr_by_page(Page *page)
     return VM_START + 0x1000 * offset;
 }
 
+extern uint64 k_pg_t[PAGE_SIZE];
+
 #endif

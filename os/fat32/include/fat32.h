@@ -22,6 +22,8 @@ typedef enum {
 	FSTATUS_OK,
 	FSTATUS_ERROR,
 	FSTATUS_NO_VOLUME,
+    FSTATUS_NOT_FILE,
+    FSTATUS_NOT_DIR,
 	FSTATUS_PATH_ERR,
 	FSTATUS_EOF
 } fstatus;
@@ -98,8 +100,8 @@ struct fat_fsinfo
 
 #define CLUSTER_INVALID                 0x0FFFFFFF          // 无效的簇号
 #define CLUSTER_FREE                    0x00                // 空闲的cluster
+#define CLUSTER_BAD                     0x0FFFFFF7          // 该簇存在坏扇区
 #define FILE_DEFAULT_CLUSTER            0x00                // 文件的缺省簇号
-#define BAD_CLUSTER                     0x0FFFFFF7          // 该簇存在坏扇区
 
 #define DIRITEM_NAME_FREE               0xE5                // 目录项空闲名标记
 #define DIRITEM_NAME_END                0x00                // 目录项结束名标记
@@ -125,7 +127,7 @@ struct fat_fsinfo
 /**
  * FAT目录项的日期类型
  */
-struct diritem_date
+struct fat_diritem_date
 {
     unsigned day : 5;                  // 日
     unsigned month : 4;                // 月
@@ -135,44 +137,44 @@ struct diritem_date
 /**
  * FAT目录项的时间类型
  */
-struct diritem_time
+struct fat_diritem_time
 {
-    unsigned second_2 : 5;             // 2秒
+    unsigned second_2 : 5;             // 2秒，真正的秒数要乘2
     unsigned minute : 6;               // 分
     unsigned hour : 5;                 // 时
 } __attribute__((__packed__));
 
 /**
- * FAT目录项
+ * FAT文件目录项
  */
-struct diritem
+struct fat_diritem
 {
-    uchar DIR_Name[8];                   // 文件名
-    uchar DIR_ExtName[3];                // 扩展名
-    uchar DIR_Attr;                      // 属性
-    uchar DIR_NTRes;                     // 固定0
-    uchar DIR_CrtTimeTeenth;             // 创建时间的毫秒
-    struct diritem_time DIR_CrtTime;         // 创建时间
-    struct diritem_time DIR_CrtDate;         // 创建日期
-    struct diritem_time DIR_LastAccDate;     // 最后访问日期
-    uint16 DIR_FstClusHI;                // 簇号高16位
-    struct diritem_time DIR_WrtTime;         // 修改时间
-    struct diritem_date DIR_WrtDate;         // 修改时期
-    uint16 DIR_FstClusL0;                // 簇号低16位
-    uint32 DIR_FileSize;                 // 文件字节大小
+    uchar DIR_Name[8];                          // 文件名，不足补空格0x20
+    uchar DIR_ExtName[3];                       // 扩展名，不足补空格0x20
+    uchar DIR_Attr;                             // 属性，只用到低6位
+    uchar DIR_NameCase;                         // 大小写
+    uchar DIR_CrtTimeTeenth;                    // 忽略，创建时间的毫秒
+    struct fat_diritem_time DIR_CrtTime;        // 创建时间
+    struct fat_diritem_date DIR_CrtDate;        // 创建日期
+    struct fat_diritem_date DIR_LastAccDate;    // 最后访问日期
+    uint16 DIR_ClusterH;                        // 簇号高16位
+    struct fat_diritem_time DIR_WrtTime;        // 修改时间
+    struct fat_diritem_date DIR_WrtDate;        // 修改日期
+    uint16 DIR_ClusterL;                        // 簇号低16位
+    uint32 DIR_FileSize;                        // 文件字节大小
 } __attribute__((__packed__));
 
 /**
  * 簇类型
  */
-typedef union _cluster32_t
+typedef union _fat_cluster32
 {
     struct {
         unsigned next : 28;                // 下一簇
         unsigned reserved : 4;             // 保留，为0
     } s;
     uint32 v;
-} cluster32;
+} fat_cluster32;
 
 
 
@@ -206,14 +208,14 @@ struct fat
     uint32 backup_sector;                // 备份扇区
     uint32 cluster_next_free;            // 下一可用的簇(建议值)
     uint32 cluster_total_free;           // 总的空闲簇数量(建议值)
-
-    struct disk * disk_part;           // 对应的分区信息
+    uchar  buf[512];                     // 文件缓存
+    struct disk *dsk;                    // 磁盘设备
 };
 
 /**
  * 时间描述结构
  */
-struct file_time
+struct fat_file_time
 {
     uint16 year;
     uchar month;
@@ -226,12 +228,12 @@ struct file_time
 /**
  * 文件类型
  */
-typedef enum _file_type
+typedef enum _fat_file_type
 {
     FAT_DIR,
     FAT_FILE,
     FAT_VOL,
-} file_type;
+} fat_file_type;
 
 #define FILE_ATTR_READONLY         (1 << 0)        // 文件只读
 
@@ -247,15 +249,15 @@ typedef enum _file_type
 /**
  * 文件信息结构
  */
-struct fileinfo
+struct fat_fileinfo
 {
-    char file_name[FILEINFO_NAME_SIZE];       // 文件名
+    char file_name[FILEINFO_NAME_SIZE];          // 文件名
     uint32 size;                                 // 文件字节大小
     uint16 attr;                                 // 文件属性
-    file_type type;                          // 文件类型
-    file_type create_time;                       // 创建时间
-    file_type last_acctime;                      // 最后访问时间
-    file_type modify_time;                       // 最后修改时间
+    fat_file_type type;                          // 文件类型
+    struct fat_file_time create_time;            // 创建时间
+    struct fat_file_time last_acctime;           // 最后访问时间
+    struct fat_file_time modify_time;            // 最后修改时间
 };
 
 /**
@@ -263,22 +265,18 @@ struct fileinfo
  */
 struct fat_file
 {
-    // xfat_obj_t obj;
+    struct fat *fat32;                  // 对应的fat结构
 
-    struct fat *xfat;                   // 对应的xfat结构
-
-    uint32 size;                     // 文件大小
-    uint16 attr;                     // 文件属性
-    file_type type;              // 文件类型
-    uint32 pos;                      // 当前位置
+    struct fat_fileinfo finfo;          // 文件属性信息
     // xfat_err_t err;                  // 上一次的操作错误码
 
-    uint32 start_cluster;            // 数据区起始簇号
-    uint32 curr_cluster;             // 当前簇号
-    uint32 dir_cluster;              // 所在的根目录的描述项起始簇号
-    uint32 dir_cluster_offset;       // 所在的根目录的描述项的簇偏移
-
-    // xfat_bpool_t bpool;             // 文件数据缓存
+    uint32 start_cluster;               // 文件数据的开始簇
+    uint32 cur_cluster;                 // 当前簇号
+    uint32 cur_sector_offset;           // 当前簇中的扇区偏移
+    uint32 cur_byte_offset;             // 当前扇区的字节偏移
+    uint32 cur_from_file_start;         // 当前数据到文件开始的偏移，即已经读取的数据大小
+    uint32 dir_cluster;                 // 所在的根目录的描述项起始簇号
+    uint32 dir_cluster_offset;          // 所在的根目录的描述项的簇偏移
 };
 
 /**
@@ -336,6 +334,14 @@ struct _xfat_fmt_info_t
     uint32 fsinfo_sector;
 };
 
+#define FILE_APPEND     0x1
+#define FILE_OVERRIDE   0x2
+
 int fat32_init(struct disk *dsk);
+int get_fat(struct fat *fat32, int index);
+int set_fat(struct fat *fat32, int index, int value);
+fstatus update_file_diritem(struct fat_file *file, int isdelete);
+fstatus search_file_in_dir(struct fat_file *dir, struct fat_file *file, const char *name, int len);
+fstatus fat_read_file(struct fat_file *file, uchar *buf, int cnt, int *ret);
 
 #endif

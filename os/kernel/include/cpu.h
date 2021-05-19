@@ -3,12 +3,6 @@
 
 #include "type.h"
 
-#define M_MODE  0
-#define S_MODE  1
-#define U_MODE  3
-
-#define CPU_N   2
-
 // static inline uint64 get_mhardid(void)
 // {
 //     uint64 rt;
@@ -300,21 +294,59 @@ static inline void set_tp(uint64 x)
                  : "r"(x));
 }
 
-#include "intr.h"
-#include "process.h"
-typedef struct _cpu
+static inline void sfence_vma(void)
 {
-    struct trap_context context;
-    void* k_sp;
+    #ifdef _K210
+    asm volatile("fence");
+    #endif
+    asm volatile("sfence.vma");
+    #ifdef _K210
+    asm volatile("fence.i");
+    #endif
+}
+
+static inline void wfi(void)
+{
+    asm volatile("wfi");
+}
+
+struct Process;
+struct cpu
+{
     uint64 old_intr;
     uint64 locks_n;
-    Process *cur_proc;
-} cpu;
+    struct Process *cur_proc;
+};
 
-extern cpu cpus[CPU_N];
+#define CPU_N   2
+extern struct cpu cpus[CPU_N];
 
-cpu* getcpu(void);
-uint64 gethartid(cpu *p);
+struct cpu* getcpu(void);
+uint64 gethartid(void);
 void cpu_init(uint64 hartid);
+
+#define M_MODE  0
+#define S_MODE  1
+#define U_MODE  3
+
+#define SIE     (1L << 1)
+#define SPIE    (1L << 5)
+#define SPP     (1L << 8)
+#define SUM     (1L << 18)
+
+#define SSIE    (1L << 1)
+#define STIE    (1L << 5)
+#define SEIE    (1L << 9)
+
+#define PTE_V (1L << 0)
+#define PTE_R (1L << 1)
+#define PTE_W (1L << 2)
+#define PTE_X (1L << 3)
+#define PTE_U (1L << 4)
+#define PTE_G (1L << 5)
+
+#define PA2PTE(pa) (((uint64)(pa)>>12)<<10)
+#define PTE2PA(pa) (((uint64)(pa)>>10)<<12)
+
 
 #endif

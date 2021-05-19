@@ -23,6 +23,7 @@ extern small_block free_small_blocks;
 extern small_block *p_free_small_blocks;
 extern big_block *p_big_blocks;
 
+void slob_init(void);
 void* slob_get_pages(uint64 page_n);
 void slob_free_pages(uint64 va, uint64 page_n);
 void* small_alloc(uint64 size);

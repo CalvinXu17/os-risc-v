@@ -12,7 +12,7 @@ void lock(spinlock *lock)
 {
     uint64 old_intr = is_intr_open();
     intr_close();
-    cpu *cur_cpu = getcpu();
+    struct cpu *cur_cpu = getcpu();
     if(cur_cpu->locks_n==0)
     {
         cur_cpu->old_intr = old_intr;
@@ -35,7 +35,7 @@ void unlock(spinlock *lock)
     __sync_lock_release(&(lock->islocked));
 
 
-    cpu *cur_cpu = getcpu();
+    struct cpu *cur_cpu = getcpu();
     cur_cpu->locks_n--;
     if(!cur_cpu->locks_n && cur_cpu->old_intr)
         intr_open();

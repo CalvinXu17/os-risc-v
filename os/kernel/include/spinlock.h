@@ -8,7 +8,7 @@ typedef struct _spinlock
 {
     char *name;
     uint64 islocked;
-    cpu *owner;
+    struct cpu *owner;
 }spinlock;
 
 void init_spinlock(spinlock *lock, char *name);

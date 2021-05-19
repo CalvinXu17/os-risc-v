@@ -372,7 +372,9 @@ uchar sd_init(void)
     }
     if (index == 0)
     {
+		#ifdef _DEBUG
         printk("SD_CMD0 is %x\n", result);
+		#endif
         return 0xFF;
     }
 
@@ -383,7 +385,9 @@ uchar sd_init(void)
 	sd_end_cmd();
 	if (result != 0x01)
 	{
+		#ifdef _DEBUG
         printk("SD_CMD8 is %x\n", result);
+		#endif
 		return 0xFF;
     }
 	index = 0xFF;
@@ -401,7 +405,9 @@ uchar sd_init(void)
 	}
 	if (index == 0)
 	{
+		#ifdef _DEBUG
         printk("SD_CMD55 is %x\n", result);
+		#endif
 		return 0xFF;
     }
 	index = 255;
@@ -416,7 +422,9 @@ uchar sd_init(void)
 	}
 	if(index == 0)
 	{
+		#ifdef _DEBUG
 	    printk("SD_CMD58 is %x\n", result);
+		#endif
 		return 0xFF;
 	}
 	if ((frame[0] & 0x40) == 0)

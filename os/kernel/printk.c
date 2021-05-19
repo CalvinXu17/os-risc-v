@@ -2,7 +2,12 @@
 #include "sbi.h"
 #include "spinlock.h"
 
-spinlock printk_lock = {"printk_lock", 0, 0};
+spinlock printk_lock;
+
+void printk_init(void)
+{
+    init_spinlock(&printk_lock, "printk_lock");
+}
 
 int put_unum(uint64 num, int base)
 {

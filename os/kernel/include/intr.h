@@ -43,6 +43,8 @@ struct trap_context
     uint64 sbadvaddr;
     uint64 scause;
     uint64 stval;
+    uint64 k_sp;
+    uint64 hartid;
 };
 
 #define INT_S_SOFT       1
@@ -90,5 +92,6 @@ static inline uint64 is_intr_open(void)
 }
 
 void intr_init(void);
+extern void trap_entry(void);
 
 #endif

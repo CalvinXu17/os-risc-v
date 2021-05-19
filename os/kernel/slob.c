@@ -2,11 +2,19 @@
 #include "page.h"
 #include "spinlock.h"
 
-small_block free_small_blocks = {.unit_n=1, .next=&free_small_blocks};
-small_block *p_free_small_blocks = &free_small_blocks;
-big_block *p_big_blocks = 0;
+small_block free_small_blocks;
+small_block *p_free_small_blocks;
+big_block *p_big_blocks;
+spinlock mm_lock;
 
-spinlock mm_lock = {"mm_lock", 0, 0};
+void slob_init(void)
+{
+	free_small_blocks.unit_n = 1;
+	free_small_blocks.next = &free_small_blocks;
+	p_free_small_blocks = &free_small_blocks;
+	p_big_blocks = 0;
+	init_spinlock(&mm_lock, "mm_lock");
+}
 
 void* slob_get_pages(uint64 page_n)
 {

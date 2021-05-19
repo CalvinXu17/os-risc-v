@@ -1,25 +1,23 @@
 #include "cpu.h"
 
-cpu cpus[CPU_N];
+struct cpu cpus[CPU_N];
 
 
-cpu* getcpu(void)
+struct cpu* getcpu(void)
 {
-    return (cpu*)get_sscratch();
-    // return &(cpus[get_tp()]);
+    return &(cpus[get_tp()]);
 }
 
-uint64 gethartid(cpu *p)
+uint64 gethartid(void)
 {
-    return p-cpus;
+    return get_tp();
 }
 
 void cpu_init(uint64 hartid)
 {
     set_tp(hartid);
-    cpu *p = &cpus[hartid];
-    p->k_sp = get_sp();
+    struct cpu *p = &cpus[hartid];
     p->locks_n = 0;
     p->old_intr = 0;
-    set_sscratch((uint64)p);
+    p->cur_proc = 0;
 }

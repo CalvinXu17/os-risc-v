@@ -42,23 +42,22 @@ static inline void sbi_remote_sfence_vma_asid(const unsigned long *hart_mask,
                                 unsigned long asid) __attribute__((always_inline));
 static inline void sbi_shutdown(void) __attribute__((always_inline));
 
-#define sbi_ecall(EID, FID, arg0, arg1, arg2, arg3) \
-({ \
-    sbiret rt; \
-    asm volatile("mv a7, %2\n\t" \
-                 "mv a6, %3\n\t" \
-                 "mv a0, %4\n\t" \
-                 "mv a1, %5\n\t" \
-                 "mv a2, %6\n\t" \
-                 "mv a3, %7\n\t" \
-                 "ecall\n\t" \
-                 "mv %0, a0\n\t" \
-                 "mv %1, a1\n" \
-                 : "=r"(rt.error), "=r"(rt.value) \
-                 : "r"(EID), "r"(FID), "r"(arg0), "r"(arg1), "r"(arg2), "r"(arg3) \
-                 : "memory"); \
-    rt; \
-})
+static inline sbiret sbi_ecall(uint64 EID, uint64 FID, uint64 arg0, uint64 arg1, uint64 arg2, uint64 arg3) {
+	sbiret rt;
+    register uint64 a0 asm("a0") = arg0;
+	register uint64 a1 asm("a1") = arg1;
+	register uint64 a2 asm("a2") = arg2;
+	register uint64 a3 asm("a3") = arg3;
+	register uint64 a6 asm("a6") = FID;
+	register uint64 a7 asm("a7") = EID;
+	asm volatile ("ecall"
+                : "+r"(a0), "+r"(a1)
+                : "r"(a2), "r"(a3), "r"(a6), "r"(a7)
+                : "memory");
+    rt.error = a0;
+    rt.value = a1;
+    return rt;
+}
 
 static inline void sbi_set_timer(uint64 stime_value)
 {

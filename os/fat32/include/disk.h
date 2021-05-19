@@ -2,7 +2,6 @@
 #define DISK_H
 
 #include "type.h"
-#include "fat32.h"
 
 struct disk
 {

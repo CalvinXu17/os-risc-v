@@ -14,15 +14,22 @@ uint64 align4k(uint64 s)
 
 void page_init(void)
 {
+    #ifdef _DEBUG
     printk("page init...\n");
+    #endif
     extern char _start[1]; // _start 与 _end 在link.ld中导出
     extern char _end[1];
     uint64 k_size = (uint64)_end - (uint64)_start;
+    #ifdef _DEBUG
     printk("kernel size: 0x%lx\n", k_size);
+    #endif
     k_size = align4k(k_size);
     assert(k_size <= (PAGE_NUM << 12));
 
+    #ifdef _DEBUG
     printk("aligned kernel size: 0x%lx\n", k_size);
+    #endif
+
     int i;
     for(i=0;i<(k_size >> 12)+(K_OFFSET>>12);i++)  // 初始化sbi以及内核所占的页面
     {
@@ -48,7 +55,9 @@ void page_init(void)
         pages_map[i].ref_cnt = 0;
         init_list(&(pages_map[i].page_list));
     }
+    #ifdef _DEBUG
     printk("page init success!\n");
+    #endif
 }
 
 Page* alloc_pages(uint64 n) // 首次适应法

@@ -3,6 +3,7 @@
 
 #include "type.h"
 #include "cpu.h"
+#include "intr.h"
 
 // qemu 10MHz, k210 6.5MHz
 #ifdef _QEMU
@@ -14,6 +15,6 @@
 
 void timer_init(uint64 stime_value);
 void set_next_time(void);
-void timer_handler(cpu *);
+void timer_handler(struct trap_context *);
 
 #endif

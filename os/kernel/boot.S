@@ -25,7 +25,7 @@ go:
     addi t1, t1, 1
     mul t0, t0, t1
     add sp, sp, t0
-    la t0, kstart
+    la t0, osmain
     jr t0
 loop:
     j loop

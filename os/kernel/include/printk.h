@@ -25,6 +25,7 @@ static inline int puts(const char *s)
     }
     return cnt;
 }
+void printk_init(void);
 int printk(const char *fmt, ...);
 
 #endif

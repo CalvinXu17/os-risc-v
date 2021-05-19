@@ -12,7 +12,7 @@
 
 int cpuid()
 {
-  return gethartid(getcpu());
+  return gethartid();
 }
 
 void plicinit(void)

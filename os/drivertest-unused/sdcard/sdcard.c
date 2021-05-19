@@ -133,7 +133,9 @@ static int switch_to_SPI_mode(void) {
 		if (0x01 == result) break;
 	}
 	if (0 == timeout) {
+		#ifdef _DEBUG
 		printk("SD_CMD0 failed\n");
+		#endif
 		return 0xff;
 	}
 
@@ -156,14 +158,17 @@ static int verify_operation_condition(void) {
 	sd_end_cmd();
 
 	if (0x09 == result) {
+		#ifdef _DEBUG
 		printk("invalid CRC for CMD8\n");
+		#endif
 		return 0xff;
 	}
 	else if (0x01 == result && 0x01 == (frame[2] & 0x0f) && 0xaa == frame[3]) {
 		return 0x00;
 	}
-
+	#ifdef _DEBUG
 	printk("verify_operation_condition() fail!\n");
+	#endif
 	return 0xff;
 }
 
@@ -191,8 +196,10 @@ static int read_OCR(void) {
 	}
 
 	// timeout!
+	#ifdef _DEBUG
 	printk("read_OCR() timeout!\n");
 	printk("result = %d\n", result);
+	#endif
 	return 0xff;
 }
 
@@ -206,7 +213,9 @@ static int set_SDXC_capacity(void) {
 		result = sd_get_response_R1();
 		sd_end_cmd();
 		if (0x01 != result) {
+			#ifdef _DEBUG
 			printk("SD_CMD55 fail! result = %d\n", result);
+			#endif
 			return 0xff;
 		}
 
@@ -218,9 +227,11 @@ static int set_SDXC_capacity(void) {
 		}
 	}
 
-	// timeout! 
+	// timeout!
+	#ifdef _DEBUG
 	printk("set_SDXC_capacity() timeout!\n");
 	printk("result = %d\n", result);
+	#endif
 	return 0xff;
 }
 
@@ -242,16 +253,22 @@ static int check_block_size(void) {
 
 		if (0 == result) {
 			if (ocr[0] & 0x40) {
+				#ifdef _DEBUG
 				printk("SDHC/SDXC detected\n");
+				#endif
 				if (512 != BSIZE) {
+					#ifdef _DEBUG
 					printk("BSIZE != 512\n");
+					#endif
 					return 0xff;
 				}
 
 				is_standard_sd = 0;
 			}
 			else {
+				#ifdef _DEBUG
 				printk("SDSC detected, setting block size\n");
+				#endif
 
 				// setting SD card block size to BSIZE 
 				int timeout = 0xff;
@@ -264,7 +281,9 @@ static int check_block_size(void) {
 					if (0 == result) break;
 				}
 				if (0 == timeout) {
+					#ifdef _DEBUG
 					printk("check_OCR(): fail to set block size");
+					#endif
 					return 0xff;
 				}
 
@@ -275,9 +294,11 @@ static int check_block_size(void) {
 		}
 	}
 
-	// timeout! 
+	// timeout!
+	#ifdef _DEBUG
 	printk("check_OCR() timeout!\n");
 	printk("result = %d\n", result);
+	#endif
 	return 0xff;
 }
 
@@ -435,9 +456,11 @@ void sdcard_write_sector(uchar *buf, int sectorno) {
 	sd_end_cmd();
 	if (0 != result || 0 != error_code) {
 		releasesleep(&sdcard_lock);
+		#ifdef _DEBUG
 		printk("result: %x\n", result);
 		printk("error_code: %x\n", error_code);
 		panic("sdcard: an error occurs when writing");
+		#endif
 	}
 
 	releasesleep(&sdcard_lock);
@@ -462,12 +485,17 @@ void test_sdcard(void) {
 		sdcard_read_sector(buf, sec);
 		for (int i = 0; i < BSIZE; i ++) {
 			if (0 == i % 16) {
+				#ifdef _DEBUG
 				printk("\n");
+				#endif
 			}
-
+			#ifdef _DEBUG
 			printk("%x ", buf[i]);
+			#endif
 		}
+		#ifdef _DEBUG
 		printk("\n");
+		#endif
 	}
 
 	while (1) ;
