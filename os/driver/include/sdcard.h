@@ -3,6 +3,54 @@
 
 #include "type.h"
 
+/*
+ * SD Card Commands
+ * @brief  Commands: CMDxx = CMD-number | 0x40
+ */
+#define SD_CMD_SIGN (0x40)
+#define SD_CMD0     0   // chip reset
+#define SD_CMD8     8   // voltage negotiation
+#define SD_CMD9     9   // read CSD register
+#define SD_CMD10    10  // read CID register
+#define SD_CMD12    12  // end multiple continuous sector read
+#define SD_CMD16    16  /*!< CMD16 = 0x50 */
+#define SD_CMD17    17  // start single sector read
+#define SD_CMD18    18  // start multiple continuous sector read and send start sector
+#define SD_ACMD23   23  // start multiple continuous sector write and send sector count
+#define SD_CMD24    24  // start single sector write
+#define SD_CMD25    25  // start multiple continuous sector write and send start sector
+#define SD_ACMD41   41  // capacity mode set
+#define SD_CMD55    55  // ACMD prefix
+#define SD_CMD58    58  // read CCS(card capacity status)
+#define SD_CMD59    59  /*!< CMD59 = 0x59 */
+
+#define SD_INIT_MODE_RESULT_OK                      (0x01)
+#define SD_TRANS_MODE_RESULT_OK                     (0x00)
+#define SD_START_DATA_READ_RESPONSE                 (0xFE)
+#define SD_START_DATA_SINGLE_BLOCK_READ    			(0xFE)  /*!< Data token start byte, Start Single Block Read */
+#define SD_START_DATA_MULTIPLE_BLOCK_READ  			(0xFE)  /*!< Data token start byte, Start Multiple Block Read */
+#define SD_START_DATA_SINGLE_BLOCK_WRITE   			(0xFE)  /*!< Data token start byte, Start Single Block Write */
+#define SD_START_DATA_SINGLE_BLOCK_WRITE   			(0xFE)  /*!< Data token start byte, Start Single Block Write */
+#define SD_START_DATA_MULTIPLE_BLOCK_WRITE 			(0xFC)  /*!< Data token start byte, Start Multiple Block Write */
+
+/**
+ * CMD frame format
+ * |   CRC  | arg[31:24] | arg[23:16] | arg[15:8] | arg[7:0] |   CMD  |
+ * | byte 5 |    bit 4   |    bit 3   |   bit 2   |   bit 1  |  bit 0 |
+ */
+#define SD_CMD_CMD_BIT              0
+#define SD_CMD_ARG_MSB0             1
+#define SD_CMD_ARG_MSB1             2
+#define SD_CMD_ARG_MSB2             3
+#define SD_CMD_ARG_MSB3             4
+#define SD_CMD_CRC_BIT              5
+#define SD_CMD_FRAME_SIZE           6
+
+#define SD_EMPTY_FILL               (0xFF)
+
+#define SD_R3_RESPONSE_REST_LENGTH  4
+#define SD_R7_RESPONSE_REST_LENGTH  4
+
 /** 
   * @brief  Card Specific Data: CSD Register   
   */ 
@@ -78,8 +126,5 @@ uchar sd_init(void);
 uchar sdcard_init(void);
 uchar sd_read_sector(uchar *data_buff, uint32 sector, uint32 count);
 uchar sd_write_sector(uchar *data_buff, uint32 sector, uint32 count);
-uchar sd_read_sector_dma(uchar *data_buff, uint32 sector, uint32 count);
-uchar sd_write_sector_dma(uchar *data_buff, uint32 sector, uint32 count);
-
 
 #endif

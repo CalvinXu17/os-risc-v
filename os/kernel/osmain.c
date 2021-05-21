@@ -7,22 +7,17 @@
 #include "plic.h"
 #include "console.h"
 #include "fpioa.h"
-#include "sdcard_test.h"
+#include "sdcard.h"
 #include "xdisk.h"
 #include "xfat.h"
 #include "xtypes.h"
 #include "string.h"
-
 #include "process.h"
 #include "sched.h"
 #include "syscall.h"
 
 static volatile int init_done = 0;
 
-
-// extern struct disk dsk;
-// extern struct fat fat32;
-// extern struct fat_file root_dir;
 extern xdisk_driver_t vdisk_driver;
 uchar disk_buf[XFAT_BUF_SIZE(512, 2)] = {0};
 uchar fat_buf[XFAT_BUF_SIZE(512, 2)] = {0};
@@ -47,8 +42,7 @@ void osmain(uint64 hartid)
         page_init();
         slob_init();
         console_init();
-        plicinit();
-        fpioa_pin_init();
+        
         if(!sdcard_init())
         {
             printk("sdcard init success\n");
@@ -81,13 +75,25 @@ void osmain(uint64 hartid)
             if (err < 0) {
                 panic("xfat_set_buf failed!\n");
             }
+            xfile_t file;
+            err = xfile_open(&file, "/root/main.py");
+            if (err < 0) {
+                panic("file open failed!\n");
+            }
+            char c;
+            while(xfile_read(&c, 1, 1, &file) == 1)
+            {
+                printk("%c", c);
+            }
+            printk("\n");
         } else panic("sdcard init failed\n");
         sched_init();
         syscall_init();
         proc_init();
         
-        intr_init();
+        plicinit();
         plicinithart();
+        intr_init();
         user_init(hartid);
         for(int i=1;i < CPU_N; i++)
         {
@@ -100,8 +106,8 @@ void osmain(uint64 hartid)
     {
         while(!init_done) {}
         __sync_synchronize();
-        intr_init();
         plicinithart();
+        intr_init();
     }
     #ifdef _DEBUG
     if(hartid)

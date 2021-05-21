@@ -1,28 +1,23 @@
 #include "type.h"
 #include "utils.h"
 
-void set_bit(volatile uint32 *bits, uint32 mask, uint32 value)
+void set_bits_value(volatile uint32 *bits, uint32 mask, uint32 value)
 {
-    uint32 org = (*bits) & ~mask;
-    *bits = org | (value & mask);
+    uint32 masked_origin_value = (*bits) & ~mask;
+    *bits = masked_origin_value | (value & mask);
 }
 
-void set_bit_offset(volatile uint32 *bits, uint32 mask, uint64 offset, uint32 value)
+void set_bits_value_offset(volatile uint32 *bits, uint32 mask, uint32 value, uint32 offset)
 {
-    set_bit(bits, mask << offset, value << offset);
+    set_bits_value(bits, mask << offset, value << offset);
 }
 
-void set_gpio_bit(volatile uint32 *bits, uint64 offset, uint32 value)
+void set_bit(volatile uint32 *bits, uint32 offset)
 {
-    set_bit_offset(bits, 1, offset, value);
+    set_bits_value(bits, 1 << offset, 1 << offset);
 }
 
-uint32 get_bit(volatile uint32 *bits, uint32 mask, uint64 offset)
+void clear_bit(volatile uint32 *bits, uint32 offset)
 {
-    return ((*bits) & (mask << offset)) >> offset;
-}
-
-uint32 get_gpio_bit(volatile uint32 *bits, uint64 offset)
-{
-    return get_bit(bits, 1, offset);
+    set_bits_value(bits, 1 << offset, 0);
 }

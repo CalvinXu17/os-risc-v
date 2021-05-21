@@ -36,6 +36,14 @@
 
 #define SYS_NR              261
 
+#include "type.h"
+
+struct TimeVal
+{
+    uint64 sec;  // 自 Unix 纪元起的秒数
+    uint64 usec; // 微秒数
+};
+
 #include "intr.h"
 
 void syscall_handler(struct trap_context *context);

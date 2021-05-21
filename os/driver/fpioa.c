@@ -1,7 +1,6 @@
 // FPIOA Implementation
 
 #include "fpioa.h"
-#include "sysctl.h"
 #include "mm.h"
 // #include "riscv.h"
 
@@ -4680,53 +4679,67 @@ static const fpioa_assign_t function_config[FUNC_MAX] =
          .pad_di = 0},
 };
 
-// int fpioa_init(void)
-// {
-//     int i = 0;
+int fpioa_set_function_raw(int number, fpioa_function_t function)
+{
+    /* Check parameters */
+    if(number < 0 || number >= FPIOA_NUM_IO || function < 0 || function >= FUNC_MAX)
+        return -1;
+    /* Atomic write register */
+    fpioa->io[number] = (const fpioa_io_config_t){
+        .ch_sel = function_config[function].ch_sel,
+        .ds = function_config[function].ds,
+        .oe_en = function_config[function].oe_en,
+        .oe_inv = function_config[function].oe_inv,
+        .do_sel = function_config[function].do_sel,
+        .do_inv = function_config[function].do_inv,
+        .pu = function_config[function].pu,
+        .pd = function_config[function].pd,
+        .sl = function_config[function].sl,
+        .ie_en = function_config[function].ie_en,
+        .ie_inv = function_config[function].ie_inv,
+        .di_inv = function_config[function].di_inv,
+        .st = function_config[function].st,
+        /* resv and pad_di do not need initialization */
+    };
+    return 0;
+}
 
-//     /* Enable fpioa clock in system controller */
-//     sysctl_clock_enable(SYSCTL_CLOCK_FPIOA);
+int fpioa_set_function(int pin, fpioa_function_t function)
+{
+    /**
+     * FUNC_RESV0 is the fallback, so steps are:
+     * 1. sanity check
+     * 2. if 'function' is FUNC_RESV0, we can directly set without check collision
+     *  (fallback can be occupied simultaneously by multiple pins) and return
+     * 3. while most 'function' is not FUNC_RESV0, we must first check collision and
+     *  map previous owner(if there is one and not our pin) to FUNC_RESV0
+     * 4. after collision check, we are free to set it
+   */
+    if (pin >= FPIOA_NUM_IO|| pin <0 || function >= FUNC_MAX || function <0)
+        return -1;
 
-//     /* Initialize tie */
-//     fpioa_tie_t tie = {0};
+    if (function == FUNC_RESV0)
+        goto done;
 
-//     /* Set tie enable and tie value */
-//     for(i = 0; i < FUNC_MAX; i++)
-//     {
-//         tie.en[i / 32] |= (function_config[i].tie_en << (i % 32));
-//         tie.val[i / 32] |= (function_config[i].tie_val << (i % 32));
-//     }
+    volatile fpioa_io_config_t *config;
+    for (int i = 0; i < FPIOA_NUM_IO; ++i) {
+        /*
+         * Here we have to first declare(cast) config as a
+         * volatile pointer and use it to access its ch_sel,
+         * as only in this way the compiler will generate right
+         * instructions(access the whole word rather than partial byte).
+         */
+        config = &fpioa->io[i];
+        if ((config->ch_sel == function) && (i != pin)) {
+            fpioa_set_function_raw(i, FUNC_RESV0);
+            break;
+        }
+    }
 
-//     /* Atomic write every 32bit register to fpioa function */
-//     for(i = 0; i < FUNC_MAX / 32; i++)
-//     {
-//         /* Set value before enable */
-//         fpioa->tie.val[i] = tie.val[i];
-//         fpioa->tie.en[i] = tie.en[i];
-//     }
-
-//     return 0;
-// }
-
-// int fpioa_get_io(int number, fpioa_io_config_t *cfg)
-// {
-//     /* Check parameters */
-//     if(number < 0 || number >= FPIOA_NUM_IO || cfg == NULL)
-//         return -1;
-//     /* Atomic read register */
-//     *cfg = fpioa->io[number];
-//     return 0;
-// }
-
-// int fpioa_set_io(int number, fpioa_io_config_t *cfg)
-// {
-//     /* Check parameters */
-//     if(number < 0 || number >= FPIOA_NUM_IO || cfg == NULL)
-//         return -1;
-//     /* Atomic write register */
-//     fpioa->io[number] = *cfg;
-//     return 0;
-// }
+done:
+    fpioa_set_function_raw(pin,function);
+    return 0;
+}
 
 int fpioa_set_io_pull(int number, fpioa_pull_t pull)
 {
@@ -4758,166 +4771,6 @@ int fpioa_set_io_pull(int number, fpioa_pull_t pull)
     fpioa->io[number] = cfg;
     return 0;
 }
-
-// int fpioa_get_io_pull(int number)
-// {
-//     /* Check parameters */
-//     if(number < 0 || number >= FPIOA_NUM_IO)
-//         return -1;
-
-//     fpioa_pull_t pull;
-//     /* Atomic read register */
-//     fpioa_io_config_t cfg = fpioa->io[number];
-
-//     if(cfg.pu == 0 && cfg.pd == 1)
-//         pull = FPIOA_PULL_DOWN;
-//     else if(cfg.pu == 1 && cfg.pd == 0)
-//         pull = FPIOA_PULL_UP;
-//     else
-//         pull = FPIOA_PULL_NONE;
-//     return pull;
-// }
-
-// int fpioa_set_io_driving(int number, fpioa_driving_t driving)
-// {
-//     /* Check parameters */
-//     if(number < 0 || number >= FPIOA_NUM_IO || driving >= FPIOA_DRIVING_MAX)
-//         return -1;
-
-//     /* Atomic read register */
-//     fpioa_io_config_t cfg = fpioa->io[number];
-//     /* Set IO driving */
-//     cfg.ds = driving;
-//     /* Atomic write register */
-//     fpioa->io[number] = cfg;
-//     return 0;
-// }
-
-// int fpioa_set_sl(int number, uchar sl_enable)
-// {
-//     /* Check parameters */
-//     if(number < 0 || number >= FPIOA_NUM_IO)
-//         return -1;
-
-//     /* Atomic read register */
-//     fpioa_io_config_t cfg = fpioa->io[number];
-//     /* Set IO slew rate */
-//     cfg.sl = sl_enable;
-//     /* Atomic write register */
-//     fpioa->io[number] = cfg;
-//     return 0;
-// }
-
-// int fpioa_set_st(int number, uchar st_enable)
-// {
-//     /* Check parameters */
-//     if(number < 0 || number >= FPIOA_NUM_IO)
-//         return -1;
-
-//     /* Atomic read register */
-//     fpioa_io_config_t cfg = fpioa->io[number];
-//     /* Set IO schmitt trigger */
-//     cfg.st = st_enable;
-//     /* Atomic write register */
-//     fpioa->io[number] = cfg;
-//     return 0;
-// }
-
-// int fpioa_set_oe_inv(int number, uchar inv_enable)
-// {
-//     /* Check parameters */
-//     if(number < 0 || number >= FPIOA_NUM_IO)
-//         return -1;
-
-//     /* Atomic read register */
-//     fpioa_io_config_t cfg = fpioa->io[number];
-//     /* Set IO schmitt trigger */
-//     cfg.oe_inv = inv_enable;
-//     /* Atomic write register */
-//     fpioa->io[number] = cfg;
-//     return 0;
-// }
-
-// int fpioa_get_io_driving(int number)
-// {
-//     /* Check parameters */
-//     if(number < 0 || number >= FPIOA_NUM_IO)
-//         return -1;
-
-//     return fpioa->io[number].ds;
-// }
-
-int fpioa_set_function_raw(int number, fpioa_function_t function)
-{
-    /* Check parameters */
-    if(number < 0 || number >= FPIOA_NUM_IO || function < 0 || function >= FUNC_MAX)
-        return -1;
-    /* Atomic write register */
-    fpioa->io[number] = (const fpioa_io_config_t){
-        .ch_sel = function_config[function].ch_sel,
-        .ds = function_config[function].ds,
-        .oe_en = function_config[function].oe_en,
-        .oe_inv = function_config[function].oe_inv,
-        .do_sel = function_config[function].do_sel,
-        .do_inv = function_config[function].do_inv,
-        .pu = function_config[function].pu,
-        .pd = function_config[function].pd,
-        .sl = function_config[function].sl,
-        .ie_en = function_config[function].ie_en,
-        .ie_inv = function_config[function].ie_inv,
-        .di_inv = function_config[function].di_inv,
-        .st = function_config[function].st,
-        /* resv and pad_di do not need initialization */
-    };
-    return 0;
-}
-
-int fpioa_set_function(int number, fpioa_function_t function)
-{
-    uchar index = 0;
-    /* Check parameters */
-    if(number < 0 || number >= FPIOA_NUM_IO || function < 0 || function >= FUNC_MAX)
-        return -1;
-    if(function == FUNC_RESV0)
-    {
-        fpioa_set_function_raw(number, FUNC_RESV0);
-        return 0;
-    }
-    /* Compare all IO */
-    for(index = 0; index < FPIOA_NUM_IO; index++)
-    {
-        if((fpioa->io[index].ch_sel == function) && (index != number))
-            fpioa_set_function_raw(index, FUNC_RESV0);
-    }
-    fpioa_set_function_raw(number, function);
-    return 0;
-}
-
-// int fpioa_set_tie_enable(fpioa_function_t function, int enable)
-// {
-//     /* Check parameters */
-//     if(function < 0 || function >= FUNC_MAX)
-//         return -1;
-//     /* Set tie enable */
-//     if(enable)
-//         fpioa->tie.en[function / 32] |= (1UL << (function % 32));
-//     else
-//         fpioa->tie.en[function / 32] &= (~(1UL << (function % 32)));
-//     return 0;
-// }
-
-// int fpioa_set_tie_value(fpioa_function_t function, int value)
-// {
-//     /* Check parameters */
-//     if(function < 0 || function >= FUNC_MAX)
-//         return -1;
-//     /* Set tie value */
-//     if(value)
-//         fpioa->tie.val[function / 32] |= (1UL << (function % 32));
-//     else
-//         fpioa->tie.val[function / 32] &= (~(1UL << (function % 32)));
-//     return 0;
-// }
 
 int fpioa_get_io_by_function(fpioa_function_t function)
 {

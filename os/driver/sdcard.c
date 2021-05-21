@@ -1,43 +1,18 @@
-#include "sdcard_test.h"
+#include "sdcard.h"
 #include "spi.h"
+#include "fpioa.h"
 #include "gpiohs.h"
 #include "printk.h"
 #define NULL 0
-/*
- * @brief  Start Data tokens:
- *         Tokens (necessary because at nop/idle (and CS active) only 0xff is
- *         on the data/command line)
- */
-#define SD_START_DATA_SINGLE_BLOCK_READ    0xFE  /*!< Data token start byte, Start Single Block Read */
-#define SD_START_DATA_MULTIPLE_BLOCK_READ  0xFE  /*!< Data token start byte, Start Multiple Block Read */
-#define SD_START_DATA_SINGLE_BLOCK_WRITE   0xFE  /*!< Data token start byte, Start Single Block Write */
-#define SD_START_DATA_MULTIPLE_BLOCK_WRITE 0xFC  /*!< Data token start byte, Start Multiple Block Write */
-
-/*
- * @brief  Commands: CMDxx = CMD-number | 0x40
- */
-#define SD_CMD0          0   /*!< CMD0 = 0x40 */
-#define SD_CMD8          8   /*!< CMD8 = 0x48 */
-#define SD_CMD9          9   /*!< CMD9 = 0x49 */
-#define SD_CMD10         10  /*!< CMD10 = 0x4A */
-#define SD_CMD12         12  /*!< CMD12 = 0x4C */
-#define SD_CMD16         16  /*!< CMD16 = 0x50 */
-#define SD_CMD17         17  /*!< CMD17 = 0x51 */
-#define SD_CMD18         18  /*!< CMD18 = 0x52 */
-#define SD_ACMD23        23  /*!< CMD23 = 0x57 */
-#define SD_CMD24         24  /*!< CMD24 = 0x58 */
-#define SD_CMD25         25  /*!< CMD25 = 0x59 */
-#define SD_ACMD41        41  /*!< ACMD41 = 0x41 */
-#define SD_CMD55         55  /*!< CMD55 = 0x55 */
-#define SD_CMD58         58  /*!< CMD58 = 0x58 */
-#define SD_CMD59         59  /*!< CMD59 = 0x59 */
 
 SD_CardInfo cardinfo;
 
 uchar sdcard_init()
 {
+	fpioa_pin_init();
 	return sd_init();
 }
+
 void SD_CS_HIGH(void)
 {
     gpiohs_set_pin(7, GPIO_PV_HIGH);
@@ -67,12 +42,9 @@ static void sd_write_data(uchar *data_buff, uint32 length)
 
 static void sd_read_data(uchar *data_buff, uint32 length)
 {
-
     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 8, 0);
     spi_receive_data_standard(SPI_DEVICE_0, SPI_CHIP_SELECT_3, NULL, 0, data_buff, length);
-
 }
-
 
 /*
  * @brief  Send 5 bytes command to the SD card.
@@ -125,7 +97,7 @@ static void sd_end_cmd(void)
  *         - 0xFF: Sequence failed
  *         - 0: Sequence succeed
  */
-	static uchar sd_get_response(void)
+static uchar sd_get_response(void)
 {
 	uchar result;
 	uint16 timeout = 0x0FFF;
@@ -150,7 +122,7 @@ static void sd_end_cmd(void)
  *         - status 110: Data rejected due to a Write error.
  *         - status 111: Data rejected due to other error.
  */
-static uchar sd_get_dataresponse(void)
+static uchar sd_get_data_write_response(void)
 {
 	uchar response;
 	/*!< Read resonse */
@@ -490,39 +462,52 @@ uchar sd_read_sector(uchar *data_buff, uint32 sector, uint32 count)
  */
 uchar sd_write_sector(uchar *data_buff, uint32 sector, uint32 count)
 {
-	uchar frame[2] = {0xFF};
+	uchar token[2] = {0xFF, 0x00}, dummpy_crc[2] = {0xFF, 0xFF};
 
-	if (count == 1) {
-		frame[1] = SD_START_DATA_SINGLE_BLOCK_WRITE;
-		sd_send_cmd(SD_CMD24, sector, 0);
-	} else {
-		frame[1] = SD_START_DATA_MULTIPLE_BLOCK_WRITE;
-		sd_send_cmd(SD_ACMD23, count, 0);
-		sd_get_response();
-		sd_end_cmd();
-		sd_send_cmd(SD_CMD25, sector, 0);
-	}
-	/*!< Check if the SD acknowledged the write block command: R1 response (0x00: no errors) */
-	if (sd_get_response() != 0x00) {
-		sd_end_cmd();
-		return 0xFF;
-	}
-	while (count--) {
-		/*!< Send the data token to signify the start of the data */
-		sd_write_data(frame, 2);
-		/*!< Write the block data to SD : write count data by block */
-		sd_write_data(data_buff, 512);
-		/*!< Put CRC bytes (not really needed by us, but required by SD) */
-		sd_write_data(frame, 2);
-		data_buff += 512;
-		/*!< Read data response */
-		if (sd_get_dataresponse() != 0x00) {
-			sd_end_cmd();
-			return 0xFF;
-		}
-	}
-	sd_end_cmd();
-	sd_end_cmd();
-	/*!< Returns the reponse */
-	return 0;
+    if (count == 1){
+        token[1] = SD_START_DATA_SINGLE_BLOCK_WRITE;
+        sd_send_cmd(SD_CMD24, sector, 0);
+    } else{
+        token[1] = SD_START_DATA_MULTIPLE_BLOCK_WRITE;
+        sd_send_cmd(SD_ACMD23, count, 0);
+        sd_get_response();
+        sd_end_cmd();
+        sd_send_cmd(SD_CMD25, sector, 0);
+    }
+
+    if (sd_get_response() != SD_TRANS_MODE_RESULT_OK) {
+		#ifdef _DEBUG
+        printk("Write sector(s) CMD error!\n");
+		#endif
+        return 0xFF;
+    }
+
+        while (count)
+    {
+        sd_write_data(token, 2);
+        sd_write_data(data_buff, 512);
+        sd_write_data(dummpy_crc, 2);
+
+        if (sd_get_data_write_response() != SD_TRANS_MODE_RESULT_OK) {
+			#ifdef _DEBUG
+            printk("Data write response error!\n");
+			#endif
+            return 0xFF;
+        }
+
+        data_buff += 512;
+        count--;
+    }
+
+    sd_end_cmd();
+    sd_end_cmd();
+
+    if (count > 0) {
+		#ifdef _DEBUG
+        printk("Not all sectors are written!\n");
+		#endif
+        return 0xFF;
+    }
+
+    return 0;
 }

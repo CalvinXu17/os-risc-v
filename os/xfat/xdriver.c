@@ -6,7 +6,7 @@
  */
 #include "xdisk.h"
 #include "xfat.h"
-#include "sdcard_test.h"
+#include "sdcard.h"
 
 /**
  * 初始化磁盘设备

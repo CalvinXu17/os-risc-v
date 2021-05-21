@@ -313,8 +313,6 @@ static inline void wfi(void)
 struct Process;
 struct cpu
 {
-    uint64 old_intr;
-    uint64 locks_n;
     struct Process *cur_proc;
 };
 

@@ -38,10 +38,6 @@
 #include "type.h"
 // #include "platform.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* clang-format off */
 /* Pad number settings */
 #define FPIOA_NUM_IO    (48)
@@ -846,42 +842,6 @@ typedef struct _fpioa
 extern volatile fpioa_t *const fpioa;
 
 /**
- * @brief       Initialize FPIOA user custom default settings
- *
- * @note        This function will set all FPIOA pad registers to user-defined
- *              values from kconfig
- *
- * @return      result
- *     - 0      Success
- *     - Other  Fail
- */
-int fpioa_init(void);
-
-/**
- * @brief       Get IO configuration
- *
- * @param[in]   number      The IO number
- * @param       cfg         Pointer to struct of IO configuration for specified IO
- *
- * @return      result
- *     - 0      Success
- *     - Other  Fail
- */
-int fpioa_get_io(int number, fpioa_io_config_t *cfg);
-
-/**
- * @brief       Set IO configuration
- *
- * @param[in]   number      The IO number
- * @param[in]   cfg         Pointer to struct of IO configuration for specified IO
- *
- * @return      result
- *     - 0      Success
- *     - Other  Fail
- */
-int fpioa_set_io(int number, fpioa_io_config_t *cfg);
-
-/**
  * @brief       Set IO configuration with function number
  *
  * @note        The default IO configuration which bind to function number will
@@ -911,29 +871,6 @@ int fpioa_set_function_raw(int number, fpioa_function_t function);
  */
 int fpioa_set_function(int number, fpioa_function_t function);
 
-/**
- * @brief       Set tie enable to function
- *
- * @param[in]   function    The function enum number
- * @param[in]   enable      Tie enable to set, 1 is enable, 0 is disable
- *
- * @return      result
- *     - 0      Success
- *     - Other  Fail
- */
-int fpioa_set_tie_enable(fpioa_function_t function, int enable);
-
-/**
- * @brief       Set tie value to function
- *
- * @param[in]   function    The function enum number
- * @param[in]   value       Tie value to set, 1 is HIGH, 0 is LOW
- *
- * @return      result
- *     - 0      Success
- *     - Other  Fail
- */
-int fpioa_set_tie_value(fpioa_function_t function, int value);
 
 /**
  * @brief      Set IO pull function
@@ -947,39 +884,6 @@ int fpioa_set_tie_value(fpioa_function_t function, int value);
  */
 int fpioa_set_io_pull(int number, fpioa_pull_t pull);
 
-/**
- * @brief       Get IO pull function
- *
- * @param[in]   number  The IO number
- *
- * @return      result
- *     - -1     Fail
- *     - Other  The pull enum number
- */
-int fpioa_get_io_pull(int number);
-
-/**
- * @brief       Set IO driving
- *
- * @param[in]   number   The IO number
- * @param[in]   driving  The driving enum number
- *
- * @return      result
- *     - 0      Success
- *     - Other  Fail
- */
-int fpioa_set_io_driving(int number, fpioa_driving_t driving);
-
-/**
- * @brief       Get IO driving
- *
- * @param[in]   number  The IO number
- *
- * @return      result
- *     - -1     Fail
- *     - Other  The driving enum number
- */
-int fpioa_get_io_driving(int number);
 
 /**
  * @brief       Get IO by function
@@ -992,45 +896,6 @@ int fpioa_get_io_driving(int number);
  */
 int fpioa_get_io_by_function(fpioa_function_t function);
 
-/**
- * @brief       Set IO slew rate control
- *
- * @param[in]   number      The IO number
- * @param[in]   sl_value    Enable slew rate. 0: disable 1:enable
- *
- * @return      result
- *     - 0      Success
- *     - Other  Fail
- */
-int fpioa_set_sl(int number, uchar sl_enable);
-
-/**
- * @brief       Set IO schmitt trigger
- *
- * @param[in]   number       The IO number
- * @param[in]   st_enable    Enable schmitt trigger. 0: disable 1:enable
- *
- * @return      result
- *     - 0      Success
- *     - Other  Fail
- */
-int fpioa_set_st(int number, uchar st_enable);
-
-/**
- * @brief       Set IO output invert enable
- *
- * @param[in]   number       The IO number
- * @param[in]   inv_enable   Enable output invert. 0: disable 1:enable
- *
- * @return      result
- *     - 0      Success
- *     - Other  Fail
- */
-int fpioa_set_oe_inv(int number, uchar inv_enable);
-
 void fpioa_pin_init(void);
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* _DRIVER_FPIOA_H */

@@ -38,9 +38,8 @@ buildos:
 	$(CC) $(CFLAGS) -c -o $(BUILD)fpioa.o ./os/driver/fpioa.c
 	$(CC) $(CFLAGS) -c -o $(BUILD)gpiohs.o ./os/driver/gpiohs.c
 	$(CC) $(CFLAGS) -c -o $(BUILD)spi.o ./os/driver/spi.c
-	$(CC) $(CFLAGS) -c -o $(BUILD)sysctl.o ./os/driver/sysctl.c
 	$(CC) $(CFLAGS) -c -o $(BUILD)utils.o ./os/driver/utils.c
-	$(CC) $(CFLAGS) -c -o $(BUILD)sdcard_test.o ./os/driver/sdcard_test.c
+	$(CC) $(CFLAGS) -c -o $(BUILD)sdcard.o ./os/driver/sdcard.c
 
 	$(CC) $(CFLAGS) -c -o $(BUILD)xdisk.o ./os/xfat/xdisk.c
 	$(CC) $(CFLAGS) -c -o $(BUILD)xdriver.o ./os/xfat/xdriver.c
@@ -70,9 +69,8 @@ buildos:
 									   $(BUILD)fpioa.o \
 									   $(BUILD)gpiohs.o \
 									   $(BUILD)spi.o \
-									   $(BUILD)sysctl.o \
 									   $(BUILD)utils.o \
-									   $(BUILD)sdcard_test.o \
+									   $(BUILD)sdcard.o \
 									   $(BUILD)string.o \
 									   $(BUILD)xdisk.o \
 									   $(BUILD)xdriver.o \
@@ -84,14 +82,30 @@ buildos:
 	$(OBJCOPY) $(BUILD)kernel --strip-all -O binary $(BUILD)kernel.bin
 	$(NM) $(BUILD)/kernel | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > ./kernel.map
 
+UBUILD = ./build/user/
+UCFLAGS = -mcmodel=medany -march=rv64imafdc -fno-builtin -nostdlib -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -O
 
-builduser: CFLAGS += -I./os/user/include
+builduser: UCFLAGS += -I./os/user/include -T ./os/user/user.ld
 
 builduser:
-	$(CC) $(CFLAGS) -c -S -O -o $(BUILD)app.S ./os/user/app.c
-	$(CC) $(CFLAGS) -c -O -o $(BUILD)app.o ./os/user/app.c
-	$(LD) -m elf64lriscv -nostdlib -Ttext 0x0 -e AppMain -o $(BUILD)app $(BUILD)app.o
-	$(OBJCOPY) $(BUILD)app --strip-all -O binary $(BUILD)app.bin
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)stdio.o ./os/user/stdio.c
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)stdlib.o ./os/user/stdlib.c
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)string.o ./os/user/string.c
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)syscall.o ./os/user/syscall.c
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)app.o ./os/user/app.c
+	$(LD) -m elf64lriscv -nostdlib --gc-sections -T ./os/user/user.ld -o $(UBUILD)app $(UBUILD)app.o \
+																		$(UBUILD)stdio.o \
+																		$(UBUILD)stdlib.o \
+																		$(UBUILD)string.o \
+																		$(UBUILD)syscall.o
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)init.o ./os/user/init.c
+	$(LD) -m elf64lriscv -nostdlib --gc-sections -T ./os/user/user.ld -o $(UBUILD)init $(UBUILD)init.o
+
+	$(OBJCOPY) $(UBUILD)app --strip-all -O binary $(UBUILD)app.bin
+	$(OBJCOPY) $(UBUILD)init --strip-all -O binary $(UBUILD)init.bin
+	cp $(UBUILD)app.bin /mnt/c/Users/Calvin/Desktop/app.bin
+	powershell.exe C:/Users/Calvin/Desktop/runbin.bat app
+	# powershell.exe C:/Users/Calvin/Desktop/runbin.bat init
 
 # import virtual disk image
 # QEMUOPTS += -drive file=fs.img,if=none,format=raw,id=x0 
@@ -113,8 +127,11 @@ k210: buildos
 	powershell.exe C:/Users/Calvin/Desktop/run.bat
 clean:
 	rm -f ./build/*.o
+	rm -f ./build/user/*.o
 cleanx:
 	rm -f ./build/*.o
 	rm -f ./build/*.bin
+	rm -f ./build/user/*
 	rm -f ./build/kernel
 	rm -f ./build/app
+

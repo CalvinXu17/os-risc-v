@@ -1,13 +1,17 @@
-#include "usyscall.h"
+#include "syscall.h"
+#include "stdio.h"
+#include "unistd.h"
 
-
-void AppMain(void)
+int sys_test(int c)
 {
-    unsigned long long t; 
+    return syscall(SYS_test, c);
+}
+
+int main(void)
+{
     while(1)
     {
-        sys_test('a');
-        t = 100000000;
-        while(t--) {}
+        printf("return value is %d\n", sleep(3));
     }
+    return 0;
 }

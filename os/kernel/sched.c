@@ -36,6 +36,7 @@ void scheduler(void)
             del_list(l);
             lock(&p->lock);
             p->status = PROC_RUN;
+            p->t_slice = T_SLICE;
             p->tcontext.hartid = hartid; // 更新被调度进程的hartid为当前cpu的id
             cpu->cur_proc = p;
             sapt = ((((uint64)p->pg_t) - PV_OFFSET) >> 12) | (8L << 60);
@@ -84,13 +85,7 @@ void sleep(struct semephore *s)
     lock(&p->lock);
     p->status = PROC_SLEEP;
     p->data = s;
-    // add p to sleep_list;
-    lock(&list_lock);
-    add_before(&sleep_list, &p->status_list);
-    unlock(&p->lock);
-    unlock(&list_lock);
-    
-    switch2sched();
+    move_switch2sched(p, &sleep_list);
 }
 
 void wakeup(struct semephore *s)
@@ -99,7 +94,7 @@ void wakeup(struct semephore *s)
     lock(&list_lock);
     list *l = sleep_list.next;
     list *t = 0;
-    while(l != l->next)
+    while(l != &sleep_list)
     {
         t = l;
         struct Process *p = list2proc(t);

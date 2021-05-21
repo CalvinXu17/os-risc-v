@@ -63,47 +63,6 @@ typedef enum _gpio_pin_value
 /* clang-format on */
 
 /**
- * @brief      GPIO bits raw object
- */
-typedef struct _gpiohs_raw
-{
-    /* Address offset 0x00 */
-    uint32 input_val;
-    /* Address offset 0x04 */
-    uint32 input_en;
-    /* Address offset 0x08 */
-    uint32 output_en;
-    /* Address offset 0x0c */
-    uint32 output_val;
-    /* Address offset 0x10 */
-    uint32 pullup_en;
-    /* Address offset 0x14 */
-    uint32 drive;
-    /* Address offset 0x18 */
-    uint32 rise_ie;
-    /* Address offset 0x1c */
-    uint32 rise_ip;
-    /* Address offset 0x20 */
-    uint32 fall_ie;
-    /* Address offset 0x24 */
-    uint32 fall_ip;
-    /* Address offset 0x28 */
-    uint32 high_ie;
-    /* Address offset 0x2c */
-    uint32 high_ip;
-    /* Address offset 0x30 */
-    uint32 low_ie;
-    /* Address offset 0x34 */
-    uint32 low_ip;
-    /* Address offset 0x38 */
-    uint32 iof_en;
-    /* Address offset 0x3c */
-    uint32 iof_sel;
-    /* Address offset 0x40 */
-    uint32 output_xor;
-} __attribute__((packed, aligned(4))) gpiohs_raw_t;
-
-/**
  * @brief       GPIO bits object
  */
 typedef struct _gpiohs_bits
@@ -223,16 +182,6 @@ extern volatile gpiohs_t *const gpiohs;
  */
 void gpiohs_set_drive_mode(uchar pin, gpio_drive_mode_t mode);
 
-/**
- * @brief       Get Gpiohs pin value
- *
- * @param[in]   pin     Gpiohs pin
- * @return      Pin     value
- *
- *     - GPIO_PV_Low     Gpiohs pin low
- *     - GPIO_PV_High    Gpiohs pin high
- */
-gpio_pin_value_t gpiohs_get_pin(uchar pin);
 
 /**
  * @brief      Set Gpiohs pin value
@@ -241,40 +190,5 @@ gpio_pin_value_t gpiohs_get_pin(uchar pin);
  * @param[in]   value    Gpiohs pin value
  */
 void gpiohs_set_pin(uchar pin, gpio_pin_value_t value);
-
-/**
- * @brief      Set Gpiohs pin edge for interrupt
- *
- * @param[in]   pin         Gpiohs pin
- * @param[in]   edge        Gpiohs pin edge type
- */
-void gpiohs_set_pin_edge(uchar pin, gpio_pin_edge_t edge);
-
-/**
- * @brief      Set Gpiohs pin interrupt
- *
- * @param[in]   pin             Gpiohs pin
- * @param[in]   priority        Gpiohs pin interrupt priority
- * @param[in]   func            Gpiohs pin interrupt service routine
- */
-void gpiohs_set_irq(uchar pin, uint32 priority, void (*func)());
-
-/**
- * @brief      Set Gpiohs pin interrupt
- *
- * @param[in]   pin             Gpiohs pin
- * @param[in]   priority        Gpiohs pin interrupt priority
- * @param[in]   callback        Gpiohs pin interrupt service routine
- * @param[in]   ctx             Gpiohs interrupt param
- */
-//void gpiohs_irq_register(uchar pin, uint32 priority, plic_irq_callback_t callback, void *ctx);
-
-/**
- * @brief      Unregister Gpiohs pin interrupt
- *
- * @param[in]   pin             Gpiohs pin
- */
-void gpiohs_irq_unregister(uchar pin);
-
 
 #endif /* _DRIVER_GPIOHS_H */

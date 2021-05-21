@@ -94,10 +94,6 @@ void intr_handler(struct trap_context *p)
         #endif
         break;
     case INT_S_EXTERNAL:
-        #ifdef _DEBUG
-        printk("INT_S_EXTERNAL\n");
-        #endif
-
         #ifdef _QEMU
         ext_intr_handler(p);
         #endif
@@ -115,34 +111,44 @@ void exception_handler(struct trap_context *p)
     switch (p->scause)
     {
     case EXCPT_MISALIGNED_INST:
+        printk("EXCPT_MISALIGNED_INST\n");
         break;
     case EXCPT_FAULT_EXE_INST:
+        printk("EXCPT_FAULT_EXE_INST\n");
         break;
     case EXCPT_ILLEGAL_INST:
+        printk("EXCPT_ILLEGAL_INST\n");
         break;
     case EXCPT_BREAKPOINT:
         break;
     case EXCPT_MISALIGNED_LOAD:
+        printk("EXCPT_MISALIGNED_LOAD\n");
         break;
     case EXCPT_FAULT_LOAD:
+        printk("EXCPT_FAULT_LOAD\n");
         break;
     case EXCPT_MISALIGNED_STORE:
         break;
     case EXCPT_FAULT_STORE:
+        printk("EXCPT_FAULT_STORE\n");
         break;
     case EXCPT_U_ECALL:
         syscall_handler(p);
         p->sepc += 4; // 执行ecall下一条指令
         break;
     case EXCPT_S_ECALL:
+        printk("EXCPT_S_ECALL\n");
         break;
     case EXCPT_M_ECALL:
         break;
     case EXCPT_INS_PAGE_FAULT:
+        printk("EXCPT_INS_PAGE_FAULT\n");
         break;
     case EXCPT_LOAD_PAGE_FAULT:
+        printk("EXCPT_LOAD_PAGE_FAULT\n");
         break;
     case EXCPT_STORE_PAGE_FAULT:
+        printk("EXCPT_STORE_PAGE_FAULT\n");
         break;
     default:
         #ifdef _DEBUG
