@@ -35,7 +35,7 @@ direct_switch: # void direct_switch(proc_context *oldp, pro_context *newp);
 #a1  void *proc_lock
 #a2  void *list_lock
 #a3  void *ready_list
-#a4  void *status_list
+#a4  void *status_list_node
 #a5  void *schedcontext
 _move_switch: # 先保存，再入队，再解锁
     sd ra, 0*8(a0)    # save process

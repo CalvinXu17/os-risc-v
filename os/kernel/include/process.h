@@ -4,6 +4,7 @@
 #include "type.h"
 #include "list.h"
 #include "spinlock.h"
+#include "sem.h"
 #include "intr.h"
 
 #define PROC_N  100
@@ -48,14 +49,23 @@ struct Process
     int64 t_wait;
     int64 t_slice;
 
-    list *parent;
+    char code;
+    struct semephore signal;
+
+    struct Process *parent;
+    list status_list_node;
+
+    list child_list_node;
     list child_list;
-    list status_list;
+    
     void *data;
     spinlock lock;
 };
 
-#define list2proc(l)   GET_STRUCT_ENTRY(l, struct Process, status_list)
+#define status_list_node2proc(l)    GET_STRUCT_ENTRY(l, struct Process, status_list_node)
+#define child_list2proc(l)          GET_STRUCT_ENTRY(l, struct Process, child_list)
+#define child_list_node2proc(l)     GET_STRUCT_ENTRY(l, struct Process, child_list_node)
+
 #define set_user_mode(p) ({ \
     uint64 sstatus = p->sstatus; \
     sstatus &= (~SPP); \
@@ -67,5 +77,9 @@ void proc_init(void);
 int32 get_pid(void);
 void free_pid(int32 pid);
 void user_init(int hartid);
+
+struct Process* new_proc(void);
+void free_process_mem(struct Process *proc);
+void free_process_struct(struct Process *proc);
 
 #endif

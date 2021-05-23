@@ -93,5 +93,6 @@ static inline uint64 is_intr_open(void)
 
 void intr_init(void);
 extern void trap_entry(void);
+extern void trap_ret(void);
 
 #endif

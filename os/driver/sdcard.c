@@ -34,16 +34,17 @@ static void sd_lowlevel_init(uchar spi_index)
     // spi_set_clk_rate(SPI_DEVICE_0, 200000);     /*set clk rate*/
 }
 
+// TODO: 保持与评测机一致，为SPI_CHIP_SELECT_0而不是SPI_CHIP_SELECT_3
 static void sd_write_data(uchar *data_buff, uint32 length)
 {
     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 8, 0);
-    spi_send_data_standard(SPI_DEVICE_0, SPI_CHIP_SELECT_3, NULL, 0, data_buff, length);
+    spi_send_data_standard(SPI_DEVICE_0, SPI_CHIP_SELECT_0, NULL, 0, data_buff, length);
 }
 
 static void sd_read_data(uchar *data_buff, uint32 length)
 {
     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 8, 0);
-    spi_receive_data_standard(SPI_DEVICE_0, SPI_CHIP_SELECT_3, NULL, 0, data_buff, length);
+    spi_receive_data_standard(SPI_DEVICE_0, SPI_CHIP_SELECT_0, NULL, 0, data_buff, length);
 }
 
 /*

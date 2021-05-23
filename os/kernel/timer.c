@@ -20,24 +20,22 @@ void timer_handler(struct trap_context *p)
 {
     sbi_set_timer(get_time() + tbase); // 设置下一次中断事件
     struct Process *proc;
-    list *w = wait_list.next;
-    
+
     lock(&list_lock);
+    list *w = wait_list.next;
     while(w != &wait_list)
     {
-        proc = list2proc(w);
-        lock(&proc->lock);
-        proc->t_wait -= 10;
-        if(proc->t_wait < 0)
+        proc = status_list_node2proc(w);
+        if(get_time() >= proc->t_wait)
         {
             list *next = w->next;
             proc->t_wait = 0;
             del_list(w);
             add_before(&ready_list, w);
             w = next;
+            break;
         } else     
             w = w->next;
-        unlock(&proc->lock);
     }
     unlock(&list_lock);
 

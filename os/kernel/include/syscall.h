@@ -2,7 +2,6 @@
 #define SYSCALL_H
 
 #define SYS_test            0
-#define SYS_fork            1
 #define SYS_getcwd          17
 #define SYS_dup             23
 #define SYS_dup3            24
@@ -43,6 +42,22 @@ struct TimeVal
     uint64 sec;  // 自 Unix 纪元起的秒数
     uint64 usec; // 微秒数
 };
+
+struct utsname {
+	char sysname[65];
+	char nodename[65];
+	char release[65];
+	char version[65];
+	char machine[65];
+	char domainname[65];
+};
+
+#define WNOHANG		0x00000001
+#define WUNTRACED	0x00000002
+#define WEXITED		0x00000004
+#define WCONTINUED	0x00000008
+#define WNOWAIT		0x01000000	/* Don't reap, just poll status.  */
+
 
 #include "intr.h"
 

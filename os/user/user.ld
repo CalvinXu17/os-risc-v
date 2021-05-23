@@ -1,11 +1,8 @@
 OUTPUT_ARCH(riscv)
-ENTRY(main)
-BASE_ADDRESS = 0x0;
+ENTRY(_start)
 
 SECTIONS {
-    . = BASE_ADDRESS;
     .text : { 
-        *(.text.main)
         *(.text.entry)
         *(.text .text.*)
     }

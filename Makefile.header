@@ -1,11 +1,11 @@
-AS	= riscv64-unknown-elf-as
-LD	= riscv64-unknown-elf-ld
-CC	= riscv64-unknown-elf-gcc
+AS	= /opt/kendryte-toolchain/bin/riscv64-unknown-elf-as
+LD	= /opt/kendryte-toolchain/bin/riscv64-unknown-elf-ld
+CC	= /opt/kendryte-toolchain/bin/riscv64-unknown-elf-gcc
 
-AR	= riscv64-unknown-elf-ar
-NM  = riscv64-unknown-elf-nm
-OBJCOPY = riscv64-unknown-elf-objcopy
-STRIP = riscv64-unknown-elf-strip
+AR	= /opt/kendryte-toolchain/bin/riscv64-unknown-elf-ar
+NM  = /opt/kendryte-toolchain/bin/riscv64-unknown-elf-nm
+OBJCOPY = /opt/kendryte-toolchain/bin/riscv64-unknown-elf-objcopy
+STRIP = /opt/kendryte-toolchain/bin/riscv64-unknown-elf-strip
 
 LDFLAGS = -m elf64lriscv
-CFLAGS  = -mcmodel=medany -march=rv64imafdc
+CFLAGS  = -mcmodel=medany -march=rv64imac -mabi=lp64

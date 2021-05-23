@@ -1,17 +1,25 @@
-#include "syscall.h"
 #include "stdio.h"
+#include "stdlib.h"
 #include "unistd.h"
 
-int sys_test(int c)
-{
-    return syscall(SYS_test, c);
-}
-
+int i = 1000;
 int main(void)
 {
-    while(1)
-    {
-        printf("return value is %d\n", sleep(3));
+    int cpid, wstatus;
+    cpid = fork();
+    assert(cpid != -1);
+    if(cpid == 0){
+		while(i--);
+		sched_yield();
+		printf("This is child process\n");
+        exit(3);
+    }else{
+		pid_t ret = waitpid(cpid, &wstatus, 0);
+		assert(ret != -1);
+		if(ret == cpid && WEXITSTATUS(wstatus) == 3)
+			printf("waitpid successfully.\nwstatus: %x\n", WEXITSTATUS(wstatus));
+		else
+			printf("waitpid error.\n");
     }
     return 0;
 }

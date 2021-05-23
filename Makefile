@@ -11,12 +11,12 @@ k210: CFLAGS += -D_K210
 k210: LDFLAGS += -T ./k210.ld
 
 buildos:
-	$(AS) -o $(BUILD)boot.o ./os/kernel/boot.S
-	$(AS) -o $(BUILD)intr_s.o ./os/kernel/intr.S
+	$(CC) $(CFLAGS) -c -o $(BUILD)boot.o ./os/kernel/boot.S
+	$(CC) $(CFLAGS) -c -o $(BUILD)intr_s.o ./os/kernel/intr.S
 	$(CC) $(CFLAGS) -c -o $(BUILD)intr.o ./os/kernel/intr.c
 	$(CC) $(CFLAGS) -c -o $(BUILD)timer.o ./os/kernel/timer.c
 
-	$(AS) -o $(BUILD)switch.o ./os/kernel/switch.S
+	$(CC) $(CFLAGS) -c -o $(BUILD)switch.o ./os/kernel/switch.S
 	$(CC) $(CFLAGS) -c -o $(BUILD)sched.o ./os/kernel/sched.c
 	$(CC) $(CFLAGS) -c -o $(BUILD)process.o ./os/kernel/process.c
 	$(CC) $(CFLAGS) -c -o $(BUILD)syscall.o ./os/kernel/syscall.c
@@ -85,27 +85,28 @@ buildos:
 UBUILD = ./build/user/
 UCFLAGS = -mcmodel=medany -march=rv64imafdc -fno-builtin -nostdlib -nostdinc -fno-stack-protector -ffunction-sections -fdata-sections -Wall -O
 
-builduser: UCFLAGS += -I./os/user/include -T ./os/user/user.ld
+builduser: UCFLAGS += -I./os/user/include
 
 builduser:
-	$(CC) $(UCFLAGS) -c -o $(UBUILD)stdio.o ./os/user/stdio.c
-	$(CC) $(UCFLAGS) -c -o $(UBUILD)stdlib.o ./os/user/stdlib.c
-	$(CC) $(UCFLAGS) -c -o $(UBUILD)string.o ./os/user/string.c
-	$(CC) $(UCFLAGS) -c -o $(UBUILD)syscall.o ./os/user/syscall.c
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)crt.o ./os/user/lib/crt.S
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)main.o ./os/user/lib/main.c
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)stdio.o ./os/user/lib/stdio.c
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)stdlib.o ./os/user/lib/stdlib.c
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)string.o ./os/user/lib/string.c
+	$(CC) $(UCFLAGS) -c -o $(UBUILD)syscall.o ./os/user/lib/syscall.c
 	$(CC) $(UCFLAGS) -c -o $(UBUILD)app.o ./os/user/app.c
-	$(LD) -m elf64lriscv -nostdlib --gc-sections -T ./os/user/user.ld -o $(UBUILD)app $(UBUILD)app.o \
-																		$(UBUILD)stdio.o \
-																		$(UBUILD)stdlib.o \
-																		$(UBUILD)string.o \
-																		$(UBUILD)syscall.o
-	$(CC) $(UCFLAGS) -c -o $(UBUILD)init.o ./os/user/init.c
-	$(LD) -m elf64lriscv -nostdlib --gc-sections -T ./os/user/user.ld -o $(UBUILD)init $(UBUILD)init.o
+	$(LD) -m elf64lriscv -nostdlib --gc-sections -T ./os/user/user.ld -Ttext 0x1000 \
+			-o $(UBUILD)app $(UBUILD)crt.o \
+							$(UBUILD)main.o \
+							$(UBUILD)app.o \
+							$(UBUILD)stdio.o \
+							$(UBUILD)stdlib.o \
+							$(UBUILD)string.o \
+							$(UBUILD)syscall.o
 
 	$(OBJCOPY) $(UBUILD)app --strip-all -O binary $(UBUILD)app.bin
-	$(OBJCOPY) $(UBUILD)init --strip-all -O binary $(UBUILD)init.bin
 	cp $(UBUILD)app.bin /mnt/c/Users/Calvin/Desktop/app.bin
 	powershell.exe C:/Users/Calvin/Desktop/runbin.bat app
-	# powershell.exe C:/Users/Calvin/Desktop/runbin.bat init
 
 # import virtual disk image
 # QEMUOPTS += -drive file=fs.img,if=none,format=raw,id=x0 
@@ -123,8 +124,16 @@ qemu: buildos
 k210: buildos
 	cp ./sbi/k210/rustsbi-k210.bin ./build/k210.bin
 	dd if=./build/kernel.bin of=./build/k210.bin bs=128k seek=1
+
+all: k210
+	dd if=/dev/zero of=disk.img bs=3m count=1024
+	mkfs.vfat -F 32 disk.img
+	cp ./build/k210.bin ./k210.bin
+
+run: k210
 	cp ./build/k210.bin /mnt/c/Users/Calvin/Desktop/k210.bin
 	powershell.exe C:/Users/Calvin/Desktop/run.bat
+	
 clean:
 	rm -f ./build/*.o
 	rm -f ./build/user/*.o

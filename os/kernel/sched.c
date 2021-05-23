@@ -32,7 +32,7 @@ void scheduler(void)
         l = ready_list.next;
         if(!is_empty_list(l))
         {
-            p = list2proc(l);
+            p = status_list_node2proc(l);
             del_list(l);
             lock(&p->lock);
             p->status = PROC_RUN;
@@ -68,7 +68,7 @@ void switch2sched(void)
     direct_switch(&p->pcontext, &sched_context[hartid]); // 切换到scheduler()
 }
 
-extern void _move_switch(struct proc_context *pcontext, spinlock *proc_lock, spinlock *list_lock, list *ready_list, list *status_list, struct proc_context *sched_context);
+extern void _move_switch(struct proc_context *pcontext, spinlock *proc_lock, spinlock *list_lock, list *ready_list, list *status_list_node, struct proc_context *sched_context);
 void _add_before(list *l, list *newl)
 {
     add_after(l->prev, newl);
@@ -76,7 +76,7 @@ void _add_before(list *l, list *newl)
 
 void move_switch2sched(struct Process *proc, list *l)
 {
-    _move_switch(&proc->pcontext, &proc->lock, &list_lock, l, &proc->status_list, &sched_context[gethartid()]);
+    _move_switch(&proc->pcontext, &proc->lock, &list_lock, l, &proc->status_list_node, &sched_context[gethartid()]);
 }
 
 void sleep(struct semephore *s)
@@ -97,7 +97,7 @@ void wakeup(struct semephore *s)
     while(l != &sleep_list)
     {
         t = l;
-        struct Process *p = list2proc(t);
+        struct Process *p = status_list_node2proc(t);
         lock(&p->lock);
         if(p->data == s)
         {
