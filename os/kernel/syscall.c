@@ -61,68 +61,74 @@ int sys_write(int fd, const char *buf, int len)
     }
 }
 
-int sys_clone(void)
+int sys_clone(uint flags, void *stack, int ptid, int tls, int ctid)
 {
-    struct Process *parent = getcpu()->cur_proc;
-    struct Process *child = new_proc();
-    child->parent = parent;
-    
-    memcpy(&child->tcontext, &parent->tcontext, sizeof(struct trap_context));
-    child->tcontext.k_sp = (uint64)(child->k_stack) + PAGE_SIZE;
-    child->tcontext.sepc += 4; // 子进程pc+4执行ecall下一条指令
-    child->pcontext.ra = (uint64)trap_ret; // 子进程从trap_ret开始执行从内核态转换为用户态
-
-    int i, j, k;
-
-    uint64 *p_pg0, *p_pg1, *p_pg2, *p_pg3;
-    uint64 *c_pg0, *c_pg1, *c_pg2, *c_pg3;
-    
-    p_pg0 = parent->pg_t;
-    c_pg0 = kmalloc(PAGE_SIZE);
-
-    for(i = 0; i < 512; i++)
+    if(flags & SIGCHLD)
     {
-        if(p_pg0[i] & PTE_V)
+        struct Process *parent = getcpu()->cur_proc;
+        struct Process *child = new_proc();
+        child->parent = parent;
+        
+        memcpy(&child->tcontext, &parent->tcontext, sizeof(struct trap_context));
+        child->tcontext.k_sp = (uint64)(child->k_stack) + PAGE_SIZE;
+        child->tcontext.sepc += 4; // 子进程pc+4执行ecall下一条指令
+        child->pcontext.ra = (uint64)trap_ret; // 子进程从trap_ret开始执行从内核态转换为用户态
+        if(stack)
+            child->tcontext.sp = stack;
+
+        int i, j, k;
+
+        uint64 *p_pg0, *p_pg1, *p_pg2, *p_pg3;
+        uint64 *c_pg0, *c_pg1, *c_pg2, *c_pg3;
+        
+        p_pg0 = parent->pg_t;
+        c_pg0 = kmalloc(PAGE_SIZE);
+
+        for(i = 0; i < 512; i++)
         {
-            p_pg1 = PTE2PA(p_pg0[i]) + PV_OFFSET;
-            c_pg1 = kmalloc(PAGE_SIZE);
-            if(!(p_pg0[i] & PTE_R) && !(p_pg0[i] & PTE_W) && !(p_pg0[i] & PTE_X)) // 指向下一级
+            if(p_pg0[i] & PTE_V)
             {
-                c_pg0[i] = PA2PTE((uint64)c_pg1 - PV_OFFSET) | PTE_V;
-                for(j = 0; j < 512; j++)
+                p_pg1 = PTE2PA(p_pg0[i]) + PV_OFFSET;
+                c_pg1 = kmalloc(PAGE_SIZE);
+                if(!(p_pg0[i] & PTE_R) && !(p_pg0[i] & PTE_W) && !(p_pg0[i] & PTE_X)) // 指向下一级
                 {
-                    if(p_pg1[j] & PTE_V)
+                    c_pg0[i] = PA2PTE((uint64)c_pg1 - PV_OFFSET) | PTE_V;
+                    for(j = 0; j < 512; j++)
                     {
-                        p_pg2 = PTE2PA(p_pg1[j]) + PV_OFFSET;
-                        c_pg2 = kmalloc(PAGE_SIZE);
-                        if(!(p_pg1[j] & PTE_R) && !(p_pg1[j] & PTE_W) && !(p_pg1[j] & PTE_X)) // 指向下一级
+                        if(p_pg1[j] & PTE_V)
                         {
-                            c_pg1[j] = PA2PTE((uint64)c_pg2 - PV_OFFSET) | PTE_V;
-                            for(k = 0; k < 512; k++)
+                            p_pg2 = PTE2PA(p_pg1[j]) + PV_OFFSET;
+                            c_pg2 = kmalloc(PAGE_SIZE);
+                            if(!(p_pg1[j] & PTE_R) && !(p_pg1[j] & PTE_W) && !(p_pg1[j] & PTE_X)) // 指向下一级
                             {
-                                if(p_pg2[k] & PTE_V)
+                                c_pg1[j] = PA2PTE((uint64)c_pg2 - PV_OFFSET) | PTE_V;
+                                for(k = 0; k < 512; k++)
                                 {
-                                    p_pg3 = PTE2PA(p_pg2[k]) + PV_OFFSET;
-                                    c_pg3 = kmalloc(PAGE_SIZE);
-                                    memcpy(c_pg3, p_pg3, PAGE_SIZE);
-                                    c_pg2[k] = PA2PTE((uint64)c_pg3 - PV_OFFSET) | PTE_V | PTE_R | PTE_W  | PTE_X | PTE_U;
-                                } else c_pg2[k] = 0;
-                            }
-                        } else c_pg1[i] = PA2PTE((uint64)c_pg2 - PV_OFFSET) | PTE_V | PTE_R | PTE_W  | PTE_X | PTE_U;
-                    } else c_pg1[j] = 0;
-                }
-            } else c_pg0[i] = PA2PTE((uint64)c_pg1 - PV_OFFSET) | PTE_V | PTE_R | PTE_W  | PTE_X | PTE_U;
-        } else c_pg0[i] = 0;
+                                    if(p_pg2[k] & PTE_V)
+                                    {
+                                        p_pg3 = PTE2PA(p_pg2[k]) + PV_OFFSET;
+                                        c_pg3 = kmalloc(PAGE_SIZE);
+                                        memcpy(c_pg3, p_pg3, PAGE_SIZE);
+                                        c_pg2[k] = PA2PTE((uint64)c_pg3 - PV_OFFSET) | PTE_V | PTE_R | PTE_W  | PTE_X | PTE_U;
+                                    } else c_pg2[k] = 0;
+                                }
+                            } else c_pg1[i] = PA2PTE((uint64)c_pg2 - PV_OFFSET) | PTE_V | PTE_R | PTE_W  | PTE_X | PTE_U;
+                        } else c_pg1[j] = 0;
+                    }
+                } else c_pg0[i] = PA2PTE((uint64)c_pg1 - PV_OFFSET) | PTE_V | PTE_R | PTE_W  | PTE_X | PTE_U;
+            } else c_pg0[i] = 0;
+        }
+        child->pg_t = c_pg0;
+        lock(&parent->lock);
+        add_before(&parent->child_list, &child->child_list_node);
+        unlock(&parent->lock);
+        child->tcontext.a0 = 0; // 子进程返回值为0
+        lock(&list_lock);
+        add_after(&ready_list, &child->status_list_node);
+        unlock(&list_lock);
+        return child->pid;
     }
-    child->pg_t = c_pg0;
-    lock(&parent->lock);
-    add_before(&parent->child_list, &child->child_list_node);
-    unlock(&parent->lock);
-    child->tcontext.a0 = 0; // 子进程返回值为0
-    lock(&list_lock);
-    add_after(&ready_list, &child->status_list_node);
-    unlock(&list_lock);
-    return child->pid;
+    return -1;
 }
 
 int sys_waitpid(int pid, int *code, int options)
@@ -354,7 +360,7 @@ void do_sys_write(struct trap_context *context)
 
 void do_sys_clone(struct trap_context *context)
 {
-    context->a0 = sys_clone();
+    context->a0 = sys_clone(context->a0, context->a1, context->a2, context->a3, context->a4);
 }
 
 void do_sys_waitpid(struct trap_context *context)

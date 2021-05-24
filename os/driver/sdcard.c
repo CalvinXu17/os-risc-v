@@ -3,7 +3,6 @@
 #include "fpioa.h"
 #include "gpiohs.h"
 #include "printk.h"
-#define NULL 0
 
 SD_CardInfo cardinfo;
 

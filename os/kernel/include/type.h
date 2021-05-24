@@ -12,4 +12,6 @@ typedef long int            int64;
 typedef unsigned short      uint16;
 typedef short               int16;
 
+#define NULL ((void *)0)
+
 #endif

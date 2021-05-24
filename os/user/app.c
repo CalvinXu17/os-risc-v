@@ -2,24 +2,32 @@
 #include "stdlib.h"
 #include "unistd.h"
 
-int i = 1000;
-int main(void)
-{
-    int cpid, wstatus;
-    cpid = fork();
-    assert(cpid != -1);
-    if(cpid == 0){
-		while(i--);
-		sched_yield();
-		printf("This is child process\n");
-        exit(3);
+size_t stack[1024] = {0};
+static int child_pid;
+
+static int child_func(void){
+    printf("  Child says successfully!\n");
+    return 0;
+}
+
+void test_clone(void){
+    TEST_START(__func__);
+    int wstatus;
+    child_pid = clone(child_func, NULL, stack, 1024, SIGCHLD);
+    assert(child_pid != -1);
+    if (child_pid == 0){
+	exit(0);
     }else{
-		pid_t ret = waitpid(cpid, &wstatus, 0);
-		assert(ret != -1);
-		if(ret == cpid && WEXITSTATUS(wstatus) == 3)
-			printf("waitpid successfully.\nwstatus: %x\n", WEXITSTATUS(wstatus));
-		else
-			printf("waitpid error.\n");
+	if(wait(&wstatus) == child_pid)
+	    printf("clone process successfully.\npid:%d\n", child_pid);
+	else
+	    printf("clone process error.\n");
     }
+
+    TEST_END(__func__);
+}
+
+int main(void){
+    test_clone();
     return 0;
 }

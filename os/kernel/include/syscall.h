@@ -58,6 +58,8 @@ struct utsname {
 #define WCONTINUED	0x00000008
 #define WNOWAIT		0x01000000	/* Don't reap, just poll status.  */
 
+#define SIGCHLD   17
+
 
 #include "intr.h"
 
