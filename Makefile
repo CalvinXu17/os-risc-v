@@ -14,8 +14,13 @@ KLFLAGS = $(LFLAGS)
 
 qemu: KCFLAGS += -D_QEMU
 qemu: KLFLAGS += -T ./qemu.ld
-k210: KCFLAGS += -D_K210
-k210: KLFLAGS += -T ./k210.ld
+KCFLAGS += -D_K210
+KLFLAGS += -T ./k210.ld
+
+all: buildos							   
+	cp ./sbi/k210/rustsbi-k210.bin ./build/k210.bin
+	dd if=./build/kernel.bin of=./build/k210.bin bs=128k seek=1
+	cp ./build/k210.bin ./k210.bin
 
 buildos:
 	$(CC) $(KCFLAGS) -c -o $(BUILD)boot.o ./os/kernel/boot.S
@@ -46,6 +51,7 @@ buildos:
 	$(CC) $(KCFLAGS) -c -o $(BUILD)gpiohs.o ./os/driver/gpiohs.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)spi.o ./os/driver/spi.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)utils.o ./os/driver/utils.c
+	# $(CC) $(KCFLAGS) -c -o $(BUILD)sysctl.o ./os/driver/sysctl.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)sdcard.o ./os/driver/sdcard.c
 
 	$(CC) $(KCFLAGS) -c -o $(BUILD)xdisk.o ./os/xfat/xdisk.c
@@ -77,6 +83,7 @@ buildos:
 									   $(BUILD)gpiohs.o \
 									   $(BUILD)spi.o \
 									   $(BUILD)utils.o \
+									   \
 									   $(BUILD)sdcard.o \
 									   $(BUILD)string.o \
 									   $(BUILD)xdisk.o \
@@ -132,11 +139,6 @@ qemu: buildos
 k210: buildos
 	cp ./sbi/k210/rustsbi-k210.bin ./build/k210.bin
 	dd if=./build/kernel.bin of=./build/k210.bin bs=128k seek=1
-
-all: k210
-	dd if=/dev/zero of=disk.img bs=3m count=1024
-	mkfs.vfat -F 32 disk.img
-	cp ./build/k210.bin ./k210.bin
 
 run: k210
 	cp ./build/k210.bin $(WSL_WINPATH)k210.bin
