@@ -24,6 +24,8 @@ uchar fat_buf[XFAT_BUF_SIZE(512, 2)] = {0};
 xdisk_t disk;
 xfat_t xfat;
 
+uchar test_buf[512];
+
 void osmain(uint64 hartid)
 {
     cpu_init(hartid);
@@ -54,12 +56,10 @@ void osmain(uint64 hartid)
             if (err < 0) {
                 panic("xdisk_open failed!\n");
             }
-
             err = xdisk_get_part(&disk, &disk_part, 0);
             if (err < 0) {
                 panic("xdisk_get_part failed!\n");
             }
-
             err = xfat_init();
             if (err < 0) {
                 panic("xfat_init failed!\n");
@@ -75,17 +75,6 @@ void osmain(uint64 hartid)
             if (err < 0) {
                 panic("xfat_set_buf failed!\n");
             }
-            xfile_t file;
-            err = xfile_open(&file, "/root/main.py");
-            if (err < 0) {
-                panic("file open failed!\n");
-            }
-            char c;
-            while(xfile_read(&c, 1, 1, &file) == 1)
-            {
-                printk("%c", c);
-            }
-            printk("\n");
         } else panic("sdcard init failed\n");
         sched_init();
         syscall_init();

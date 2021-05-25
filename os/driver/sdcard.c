@@ -90,27 +90,35 @@ static void sd_end_cmd(void)
 	sd_write_data(frame, 1);
 }
 
-/*
- * @brief  Returns the SD response.
- * @param  None
- * @retval The SD Response:
- *         - 0xFF: Sequence failed
- *         - 0: Sequence succeed
- */
-static uchar sd_get_response(void)
+static uchar sd_get_response_R1()
 {
-	uchar result;
-	uint16 timeout = 0x0FFF;
-	/*!< Check if response is got or a timeout is happen */
-	while (timeout--) {
-		sd_read_data(&result, 1);
-		// sd_read_data_dma(&result);
-		/*!< Right response got */
-		if (result != 0xFF)
-			return result;
-	}
-	/*!< After time out */
-	return 0xFF;
+    uchar result;
+    uint16 timeout = 0xFFF;
+    while (timeout--)
+    {
+        sd_read_data(&result, 1);
+        if (result != SD_EMPTY_FILL)
+            return result;
+    }
+    return 0xFF;
+}
+
+/* 
+ * Read the rest of R3 response 
+ * Be noticed: frame should be at least 4-byte long 
+ */
+static void sd_get_response_R3_rest(uchar *frame)
+{
+	sd_read_data(frame, 4);
+}
+
+/* 
+ * Read the rest of R7 response 
+ * Be noticed: frame should be at least 4-byte long 
+ */
+static void sd_get_response_R7_rest(uchar *frame)
+{
+	sd_read_data(frame, 4);
 }
 
 /*
@@ -139,6 +147,178 @@ static uchar sd_get_data_write_response(void)
 	return 0;
 }
 
+static int switch_to_SPI_mode(void)
+{
+	int timeout = 0xff;
+
+	while (--timeout) {
+		sd_send_cmd(SD_CMD0, 0, 0x95);
+		uint64 result = sd_get_response_R1();
+		sd_end_cmd();
+
+		if (0x01 == result) break;
+	}
+	if (0 == timeout) {
+		#ifdef _DEBUG
+		printk("SD_CMD0 failed\n");
+		#endif
+		return 0xff;
+	}
+	return 0;
+}
+
+// verify supply voltage range 
+static int verify_operation_condition(void) {
+	uint64 result;
+
+	// Stores the response reversely. 
+	// That means 
+	// frame[2] - VCA 
+	// frame[3] - Check Pattern 
+	uchar frame[4];
+
+	sd_send_cmd(SD_CMD8, 0x01aa, 0x87);
+	result = sd_get_response_R1();
+	sd_get_response_R7_rest(frame);
+	sd_end_cmd();
+
+	if (0x09 == result) {
+		#ifdef _DEBUG
+		printk("invalid CRC for CMD8\n");
+		#endif
+		return 0xff;
+	}
+	else if (0x01 == result && 0x01 == (frame[2] & 0x0f) && 0xaa == frame[3]) {
+		return 0x00;
+	}
+	#ifdef _DEBUG
+	printk("verify_operation_condition() fail!\n");
+	#endif
+	return 0xff;
+}
+
+// read OCR register to check if the voltage range is valid 
+// this step is not mandotary, but I advise to use it 
+static int read_OCR(void)
+{
+	uint64 result;
+	uchar ocr[4];
+
+	int timeout;
+
+	timeout = 0xff;
+	while (--timeout) {
+		sd_send_cmd(SD_CMD58, 0, 0);
+		result = sd_get_response_R1();
+		sd_get_response_R3_rest(ocr);
+		sd_end_cmd();
+
+		if (
+			0x01 == result && // R1 response in idle status 
+			(ocr[1] & 0x1f) && (ocr[2] & 0x80) 	// voltage range valid 
+		) {
+			return 0;
+		}
+	}
+
+	// timeout!
+	#ifdef _DEBUG
+	printk("read_OCR() timeout!\n");
+	printk("result = %d\n", result);
+	#endif
+	return 0xff;
+}
+
+// send ACMD41 to tell sdcard to finish initializing 
+static int set_SDXC_capacity(void)
+{
+	uchar result = 0xff;
+
+	int timeout = 0xfff;
+	while (--timeout) {
+		sd_send_cmd(SD_CMD55, 0, 0);
+		result = sd_get_response_R1();
+		sd_end_cmd();
+		if (0x01 != result) {
+			#ifdef _DEBUG
+			printk("SD_CMD55 fail! result = %d\n", result);
+			#endif
+			return 0xff;
+		}
+
+		sd_send_cmd(SD_ACMD41, 0x40000000, 0);
+		result = sd_get_response_R1();
+		sd_end_cmd();
+		if (0 == result) {
+			return 0;
+		}
+	}
+
+	// timeout! 
+	#ifdef _DEBUG
+	printk("set_SDXC_capacity() timeout!\n");
+	printk("result = %d\n", result);
+	#endif
+	return 0xff;
+}
+
+// Used to differ whether sdcard is SDSC type. 
+static int is_standard_sd = 0;
+// check OCR register to see the type of sdcard, 
+// thus determine whether block size is suitable to buffer size
+static int check_block_size(void)
+{
+	uchar result = 0xff;
+	uchar ocr[4];
+
+	int timeout = 0xff;
+	while (timeout --) {
+		sd_send_cmd(SD_CMD58, 0, 0);
+		result = sd_get_response_R1();
+		sd_get_response_R3_rest(ocr);
+		sd_end_cmd();
+
+		if (0 == result) {
+			if (ocr[0] & 0x40) {
+				#ifdef _DEBUG
+				printk("SDHC/SDXC detected\n");
+				#endif
+				is_standard_sd = 0;
+			}
+			else {
+				#ifdef _DEBUG
+				printk("SDSC detected, setting block size\n");
+				#endif
+				// setting SD card block size to BSIZE 
+				int timeout = 0xff;
+				int result = 0xff;
+				while (--timeout) {
+					sd_send_cmd(SD_CMD16, 512, 0);
+					result = sd_get_response_R1();
+					sd_end_cmd();
+
+					if (0 == result) break;
+				}
+				if (0 == timeout) {
+					#ifdef _DEBUG
+					printk("check_OCR(): fail to set block size");
+					#endif
+					return 0xff;
+				}
+				is_standard_sd = 1;
+			}
+			return 0;
+		}
+	}
+
+	// timeout! 
+	#ifdef _DEBUG
+	printk("check_OCR() timeout!\n");
+	printk("result = %d\n", result);
+	#endif
+	return 0xff;
+}
+
 /*
  * @brief  Read the CSD card register
  *         Reading the contents of the CSD register in SPI mode is a simple
@@ -154,11 +334,11 @@ static uchar sd_get_csdregister(SD_CSD *SD_csd)
 	/*!< Send CMD9 (CSD register) or CMD10(CSD register) */
 	sd_send_cmd(SD_CMD9, 0, 0);
 	/*!< Wait for response in the R1 format (0x00 is no errors) */
-	if (sd_get_response() != 0x00) {
+	if (sd_get_response_R1() != 0x00) {
 		sd_end_cmd();
 		return 0xFF;
 	}
-	if (sd_get_response() != SD_START_DATA_SINGLE_BLOCK_READ) {
+	if (sd_get_response_R1() != SD_START_DATA_SINGLE_BLOCK_READ) {
 		sd_end_cmd();
 		return 0xFF;
 	}
@@ -239,11 +419,11 @@ static uchar sd_get_cidregister(SD_CID *SD_cid)
 	/*!< Send CMD10 (CID register) */
 	sd_send_cmd(SD_CMD10, 0, 0);
 	/*!< Wait for response in the R1 format (0x00 is no errors) */
-	if (sd_get_response() != 0x00) {
+	if (sd_get_response_R1() != 0x00) {
 		sd_end_cmd();
 		return 0xFF;
 	}
-	if (sd_get_response() != SD_START_DATA_SINGLE_BLOCK_READ) {
+	if (sd_get_response_R1() != SD_START_DATA_SINGLE_BLOCK_READ) {
 		sd_end_cmd();
 		return 0xFF;
 	}
@@ -319,89 +499,26 @@ static uchar sd_get_cardinfo(SD_CardInfo *cardinfo)
  */
 uchar sd_init(void)
 {
-	uchar frame[10], index, result;
-	/*!< Initialize SD_SPI */
+	uchar frame[10];
 	sd_lowlevel_init(0);
-	/*!< SD chip select high */
-	SD_CS_HIGH();
-	/*!< Send dummy byte 0xFF, 10 times with CS high */
-	/*!< Rise CS and MOSI for 80 clocks cycles */
-	/*!< Send dummy byte 0xFF */
-	for (index = 0; index < 10; index++)
-		frame[index] = 0xFF;
-	sd_write_data(frame, 10);
-	/*------------Put SD in SPI mode--------------*/
-	/*!< SD initialized and set to SPI mode properly */
-	
-    index = 0xFF;
-    while (index--) {
-        sd_send_cmd(SD_CMD0, 0, 0x95);
-		// printf("get_response: %d\n", index);
-        result = sd_get_response();
-        sd_end_cmd();
-        if (result == 0x01)
-            break;
-    }
-    if (index == 0)
-    {
-		#ifdef _DEBUG
-        printk("SD_CMD0 is %x\n", result);
-		#endif
-        return 0xFF;
-    }
+	//SD_CS_HIGH();
+	SD_CS_LOW();
 
-	sd_send_cmd(SD_CMD8, 0x01AA, 0x87);
-	/*!< 0x01 or 0x05 */
-	result = sd_get_response();
-	sd_read_data(frame, 4);
-	sd_end_cmd();
-	if (result != 0x01)
-	{
-		#ifdef _DEBUG
-        printk("SD_CMD8 is %x\n", result);
-		#endif
-		return 0xFF;
-    }
-	index = 0xFF;
-	while (index--) {
-		sd_send_cmd(SD_CMD55, 0, 0);
-		result = sd_get_response();
-		sd_end_cmd();
-		if (result != 0x01)
-			return 0xFF;
-		sd_send_cmd(SD_ACMD41, 0x40000000, 0);
-		result = sd_get_response();
-		sd_end_cmd();
-		if (result == 0x00)
-			break;
-	}
-	if (index == 0)
-	{
-		#ifdef _DEBUG
-        printk("SD_CMD55 is %x\n", result);
-		#endif
-		return 0xFF;
-    }
-	index = 255;
-	while(index--){
-		sd_send_cmd(SD_CMD58, 0, 1);
-		result = sd_get_response();
-		sd_read_data(frame, 4);
-		sd_end_cmd();
-		if(result == 0){
-			break;
-		}
-	}
-	if(index == 0)
-	{
-		#ifdef _DEBUG
-	    printk("SD_CMD58 is %x\n", result);
-		#endif
-		return 0xFF;
-	}
-	if ((frame[0] & 0x40) == 0)
-		return 0xFF;
-	SD_HIGH_SPEED_ENABLE();
+	// send dummy bytes for 80 clock cycles 
+	for (int i = 0; i < 10; i ++) 
+		frame[i] = 0xff;
+	sd_write_data(frame, 10);
+
+	if (0 != switch_to_SPI_mode()) 
+		return 0xff;
+	if (0 != verify_operation_condition()) 
+		return 0xff;
+	if (0 != read_OCR()) 
+		return 0xff;
+	if (0 != set_SDXC_capacity()) 
+		return 0xff;
+	if (0 != check_block_size()) 
+		return 0xff;
 	return sd_get_cardinfo(&cardinfo);
 }
 
@@ -426,12 +543,12 @@ uchar sd_read_sector(uchar *data_buff, uint32 sector, uint32 count)
 		sd_send_cmd(SD_CMD18, sector, 0);
 	}
 	/*!< Check if the SD acknowledged the read block command: R1 response (0x00: no errors) */
-	if (sd_get_response() != 0x00) {
+	if (sd_get_response_R1() != 0x00) {
 		sd_end_cmd();
 		return 0xFF;
 	}
 	while (count) {
-		if (sd_get_response() != SD_START_DATA_SINGLE_BLOCK_READ)
+		if (sd_get_response_R1() != SD_START_DATA_SINGLE_BLOCK_READ)
 			break;
 		/*!< Read the SD block data : read NumByteToRead data */
 		sd_read_data(data_buff, 512);
@@ -443,7 +560,7 @@ uchar sd_read_sector(uchar *data_buff, uint32 sector, uint32 count)
 	sd_end_cmd();
 	if (flag) {
 		sd_send_cmd(SD_CMD12, 0, 0);
-		sd_get_response();
+		sd_get_response_R1();
 		sd_end_cmd();
 		sd_end_cmd();
 	}
@@ -470,12 +587,12 @@ uchar sd_write_sector(uchar *data_buff, uint32 sector, uint32 count)
     } else{
         token[1] = SD_START_DATA_MULTIPLE_BLOCK_WRITE;
         sd_send_cmd(SD_ACMD23, count, 0);
-        sd_get_response();
+        sd_get_response_R1();
         sd_end_cmd();
         sd_send_cmd(SD_CMD25, sector, 0);
     }
 
-    if (sd_get_response() != SD_TRANS_MODE_RESULT_OK) {
+    if (sd_get_response_R1() != SD_TRANS_MODE_RESULT_OK) {
 		#ifdef _DEBUG
         printk("Write sector(s) CMD error!\n");
 		#endif

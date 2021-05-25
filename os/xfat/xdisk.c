@@ -313,8 +313,13 @@ xfat_err_t xdisk_get_part(xdisk_t *disk, xdisk_part_t *xdisk_part, int part_no) 
             }
         }
 	}
-
-	return FS_ERR_NONE;
+    // 无分区
+    xdisk_part->type = 0x01;
+    xdisk_part->start_sector = 0;
+    xdisk_part->relative_sector = 0;
+    xdisk_part->total_sector = 61067264;
+    xdisk_part->disk = disk;
+	return FS_ERR_OK;
 }
 
 static xfat_err_t set_ext_part_type(xdisk_part_t* part, u32_t ext_start_sector, xfs_type_t type) {

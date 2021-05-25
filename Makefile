@@ -51,7 +51,6 @@ buildos:
 	$(CC) $(KCFLAGS) -c -o $(BUILD)gpiohs.o ./os/driver/gpiohs.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)spi.o ./os/driver/spi.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)utils.o ./os/driver/utils.c
-	# $(CC) $(KCFLAGS) -c -o $(BUILD)sysctl.o ./os/driver/sysctl.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)sdcard.o ./os/driver/sdcard.c
 
 	$(CC) $(KCFLAGS) -c -o $(BUILD)xdisk.o ./os/xfat/xdisk.c
@@ -83,7 +82,6 @@ buildos:
 									   $(BUILD)gpiohs.o \
 									   $(BUILD)spi.o \
 									   $(BUILD)utils.o \
-									   \
 									   $(BUILD)sdcard.o \
 									   $(BUILD)string.o \
 									   $(BUILD)xdisk.o \
