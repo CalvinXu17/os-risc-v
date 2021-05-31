@@ -4,6 +4,8 @@ LinanOS是本次比赛实现的一个能够运行在K210 RISC-V 64位处理器�
 
 编写LinanOS在完成比赛的同时能够学习到更多操作系统的知识，进一步提高自己，全部代码由@[CalvinXu](https://github.com/CalvinXu17)完成。
 
+github仓库地址：[CalvinXu17/os-risc-v: os on risc-v (github.com)](https://github.com/CalvinXu17/os-risc-v)
+
 ## 已实现的功能
 
 - [x] 中断、异常处理
