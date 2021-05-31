@@ -454,7 +454,7 @@ typedef enum ufile_type {
 } ufile_type_t;
 ```
 
-其中```UTYPE_LINK```文件链接暂未实现，```UTYPE_FILE```与```UTYPE_DIR```由虚拟文件系统调用底层FAT32FS实现。由于VFS实现的不完善为了系统调用的兼容使得代码增加了一层ufile，后续工作将会改进VFS来去掉ufile层来优化文件系统的代码。
+其中```UTYPE_LINK```文件链接暂未实现，```UTYPE_FILE```与```UTYPE_DIR```由虚拟文件系统调用底层FAT32FS实现。由于VFS实现的不完善为了系统调用的兼容使得代码增加了一层ufile，后续工作将会改进VFS去掉ufile层来优化文件系统的代码。
 
 VFS虚拟文件系统使用底层SD卡抽象出的设备读写操作与FAT32文件系统抽象出的文件系统操作，将设备与文件系统注册关联后使用对应用层提供统一的调用接口进行操作，实现架构图如下所示：
 
