@@ -6,8 +6,7 @@
 #include "plic.h"
 #include "console.h"
 #include "syscall.h"
-
-int64 cnt[CPU_N]={ 0 };
+#include "process.h"
 
 static void ext_intr_init(void)
 {
@@ -56,11 +55,6 @@ void ext_intr_handler(struct trap_context *p)
 
 void intr_init(void)
 {
-    int i;
-    for(i=0; i<CPU_N; i++)
-    {
-        cnt[i] = 0;
-    }
     set_stvec((uint64)trap_entry);
     ext_intr_init();
     #ifdef _DEBUG
@@ -125,7 +119,7 @@ void exception_handler(struct trap_context *p)
         printk("EXCPT_MISALIGNED_LOAD\n");
         break;
     case EXCPT_FAULT_LOAD:
-        printk("EXCPT_FAULT_LOAD\n");
+        printk("EXCPT_FAULT_LOAD 0x%lx\n", p->sbadvaddr);
         break;
     case EXCPT_MISALIGNED_STORE:
         break;
@@ -160,11 +154,24 @@ void exception_handler(struct trap_context *p)
 
 void trap_handler(struct trap_context *p)
 {
+    struct Process *proc = getcpu()->cur_proc;
+    if(proc)
+    {
+        proc->stime_start = get_time();
+        proc->utime += get_time() - proc->utime_start;
+        proc->utime_start = 0;
+    }
     if(((int64)(p->scause)) < 0) // scause最高位为1为中断，0为异常
     {
         intr_handler(p);
     } else
     {
         exception_handler(p);
+    }
+    if(proc)
+    {
+        proc->stime += get_time() - proc->stime_start;
+        proc->stime_start = 0;
+        proc->utime_start = get_time();
     }
 }

@@ -3,6 +3,7 @@
 #include "printk.h"
 
 struct proc_context sched_context[CPU_N]; // 保存scheduler调度器执行的上下文环境，切换到这里即切换到调度器运行
+uchar tmp[100];
 spinlock list_lock;
 list ready_list;
 list wait_list;
@@ -38,6 +39,13 @@ void scheduler(void)
             p->status = PROC_RUN;
             p->t_slice = T_SLICE;
             p->tcontext.hartid = hartid; // 更新被调度进程的hartid为当前cpu的id
+            if(p->start_time == 0) // 该程序第一次运行，则更新utime
+            {
+                p->start_time = get_time();
+                p->utime_start = get_time();
+                p->stime_start = 0;
+            } else p->stime_start = get_time(); // 新进程及将来到，置新的stime_start
+
             cpu->cur_proc = p;
             sapt = ((((uint64)p->pg_t) - PV_OFFSET) >> 12) | (8L << 60);
             set_sscratch(&p->tcontext); // 设置sscratch
@@ -76,6 +84,8 @@ void _add_before(list *l, list *newl)
 
 void move_switch2sched(struct Process *proc, list *l)
 {
+    proc->stime += get_time() - proc->stime_start;
+    proc->stime_start = 0;
     _move_switch(&proc->pcontext, &proc->lock, &list_lock, l, &proc->status_list_node, &sched_context[gethartid()]);
 }
 

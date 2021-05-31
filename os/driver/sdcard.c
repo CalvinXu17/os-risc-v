@@ -596,6 +596,7 @@ uchar sd_write_sector(uchar *data_buff, uint32 sector, uint32 count)
 		#ifdef _DEBUG
         printk("Write sector(s) CMD error!\n");
 		#endif
+		sd_end_cmd();
         return 0xFF;
     }
 
@@ -609,6 +610,7 @@ uchar sd_write_sector(uchar *data_buff, uint32 sector, uint32 count)
 			#ifdef _DEBUG
             printk("Data write response error!\n");
 			#endif
+			sd_end_cmd();
             return 0xFF;
         }
 

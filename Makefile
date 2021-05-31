@@ -8,13 +8,15 @@ BUILD = ./build/
 LFLAGS += -nostdlib -Wl,-gc-sections
 CFLAGS += -fno-builtin -nostdlib -nostdinc -fno-stack-protector -Wall
 
-KCFLAGS = $(CFLAGS) -D_DEBUG -O
-KCFLAGS += -I./os/kernel/include -I./os/driver/include -I./os/lib/include -I./os/fat32/include -I./os/xfat/include
+KCFLAGS = $(CFLAGS) -O
+KCFLAGS += -I./os/kernel/include -I./os/driver/include -I./os/lib/include
+# KCFLAGS += -I./os/fat32/include -I./os/xfat/include
+KCFLAGS += -I./os/vfs/include -I./os/fatfs/include -I./os/hal/include
 KLFLAGS = $(LFLAGS)
 
 qemu: KCFLAGS += -D_QEMU
 qemu: KLFLAGS += -T ./qemu.ld
-KCFLAGS += -D_K210
+KCFLAGS += -D_K210 # -D_DEBUG
 KLFLAGS += -T ./k210.ld
 
 all: buildos							   
@@ -53,11 +55,31 @@ buildos:
 	$(CC) $(KCFLAGS) -c -o $(BUILD)utils.o ./os/driver/utils.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)sdcard.o ./os/driver/sdcard.c
 
-	$(CC) $(KCFLAGS) -c -o $(BUILD)xdisk.o ./os/xfat/xdisk.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)xdriver.o ./os/xfat/xdriver.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)xfat_buf.o ./os/xfat/xfat_buf.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)xfat_obj.o ./os/xfat/xfat_obj.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)xfat.o ./os/xfat/xfat.c
+	# $(CC) $(KCFLAGS) -c -o $(BUILD)xdisk.o ./os/xfat/xdisk.c
+	# $(CC) $(KCFLAGS) -c -o $(BUILD)xdriver.o ./os/xfat/xdriver.c
+	# $(CC) $(KCFLAGS) -c -o $(BUILD)xfat_buf.o ./os/xfat/xfat_buf.c
+	# $(CC) $(KCFLAGS) -c -o $(BUILD)xfat_obj.o ./os/xfat/xfat_obj.c
+	# $(CC) $(KCFLAGS) -c -o $(BUILD)xfat.o ./os/xfat/xfat.c
+
+
+
+	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_diskio.o ./os/fatfs/tos_diskio.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_fatfs_drv.o ./os/fatfs/tos_fatfs_drv.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_fatfs_vfs.o ./os/fatfs/tos_fatfs_vfs.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_ff.o ./os/fatfs/tos_ff.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_ffsystem.o ./os/fatfs/tos_ffsystem.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_ffunicode.o ./os/fatfs/tos_ffunicode.c
+
+
+	$(CC) $(KCFLAGS) -c -o $(BUILD)vfs_device.o ./os/vfs/vfs_device.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)vfs_file.o ./os/vfs/vfs_file.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)vfs_fs.o ./os/vfs/vfs_fs.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)vfs_inode.o ./os/vfs/vfs_inode.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)vfs.o ./os/vfs/vfs.c
+
+	$(CC) $(KCFLAGS) -c -o $(BUILD)hal_sd.o ./os/hal/hal_sd.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)fs.o ./os/kernel/fs.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)pipe.o ./os/kernel/pipe.c
 
 	$(CC) $(KLFLAGS) -o $(BUILD)kernel $(BUILD)boot.o \
 									   $(BUILD)intr_s.o \
@@ -84,17 +106,30 @@ buildos:
 									   $(BUILD)utils.o \
 									   $(BUILD)sdcard.o \
 									   $(BUILD)string.o \
-									   $(BUILD)xdisk.o \
-									   $(BUILD)xdriver.o \
-									   $(BUILD)xfat_buf.o \
-									   $(BUILD)xfat_obj.o \
-									   $(BUILD)xfat.o \
+									   \
+									   \
+									   $(BUILD)tos_diskio.o \
+									   $(BUILD)tos_fatfs_drv.o \
+									   $(BUILD)tos_fatfs_vfs.o \
+									   $(BUILD)tos_ff.o \
+									   $(BUILD)tos_ffsystem.o \
+									   $(BUILD)tos_ffunicode.o \
+									   \
+									   $(BUILD)vfs_device.o \
+									   $(BUILD)vfs_file.o \
+									   $(BUILD)vfs_fs.o \
+									   $(BUILD)vfs_inode.o \
+									   $(BUILD)vfs.o \
+									   \
+									   $(BUILD)hal_sd.o \
+									   $(BUILD)fs.o \
+									   $(BUILD)pipe.o
 									   
 									   
 	$(OBJCOPY) $(BUILD)kernel --strip-all -O binary $(BUILD)kernel.bin
 	$(NM) $(BUILD)/kernel | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > ./kernel.map
 
-UBUILD = $(BUILD)/user/
+UBUILD = $(BUILD)user/
 UCFLAGS = $(CFLAGS) -O -I./os/user/include
 ULFLAGS = $(LFLAGS) -T ./os/user/user.ld
 

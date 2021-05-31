@@ -7,24 +7,15 @@
 #include "plic.h"
 #include "console.h"
 #include "fpioa.h"
-#include "sdcard.h"
-#include "xdisk.h"
-#include "xfat.h"
-#include "xtypes.h"
 #include "string.h"
 #include "process.h"
 #include "sched.h"
 #include "syscall.h"
+#include "fs.h"
+#include "vfs.h"
 
 static volatile int init_done = 0;
 
-extern xdisk_driver_t vdisk_driver;
-uchar disk_buf[XFAT_BUF_SIZE(512, 2)] = {0};
-uchar fat_buf[XFAT_BUF_SIZE(512, 2)] = {0};
-xdisk_t disk;
-xfat_t xfat;
-
-uchar test_buf[512];
 
 void osmain(uint64 hartid)
 {
@@ -44,38 +35,29 @@ void osmain(uint64 hartid)
         page_init();
         slob_init();
         console_init();
-        
-        if(!sdcard_init())
+
+        if(!fs_init())
         {
-            printk("sdcard init success\n");
-            xfat_err_t err;
-            xdisk_part_t disk_part;
-            memset(disk_buf, 0, sizeof(disk_buf));
-            memset(disk_buf, 0, sizeof(fat_buf));
-            err = xdisk_open(&disk, "sdcard", &vdisk_driver, "sdcard", disk_buf, sizeof(disk_buf));
-            if (err < 0) {
-                panic("xdisk_open failed!\n");
-            }
-            err = xdisk_get_part(&disk, &disk_part, 0);
-            if (err < 0) {
-                panic("xdisk_get_part failed!\n");
-            }
-            err = xfat_init();
-            if (err < 0) {
-                panic("xfat_init failed!\n");
-            }
+            #ifdef _DEBUG
+            panic("fs init failed\n");
+            #endif
+        }
+        #ifdef _DEBUG 
+        else {
+            printk("fs init success\n");
+        }
+        #endif
 
-            err = xfat_mount(&xfat, &disk_part, "root");
-            if (err < 0) {
-                panic("xfat_mount failed!\n");
-            }
+        // int fd = vfs_open("/root/main.py", VFS_OFLAG_READ);
+        // if(fd < 0) panic("file open failed\n");
 
-            err = xfat_set_buf(&xfat, fat_buf, sizeof(fat_buf));
+        // printk("fd: %d\n", fd);
+        // char c;
+        // while(vfs_read(fd, &c, 1)==1)
+        // {
+        //     printk("%c", c);
+        // }
 
-            if (err < 0) {
-                panic("xfat_set_buf failed!\n");
-            }
-        } else panic("sdcard init failed\n");
         sched_init();
         syscall_init();
         proc_init();

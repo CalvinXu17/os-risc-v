@@ -2,6 +2,7 @@
 #include "slob.h"
 #include "page.h"
 #include "spinlock.h"
+#include "string.h"
 
 spinlock kmalloc_lock = {"kmalloc_lock", 0, 0};
 
@@ -28,7 +29,11 @@ void *kmalloc(uint64 size)
 	{
 		m = small_alloc(size + UNIT_SIZE);
         if(!m) return 0;
-        else return (void*)(m+1);
+        else
+		{
+			memset((void*)(m+1), 0, size);
+			return (void*)(m+1);
+		}
 	}
 
 	bigblock = small_alloc(sizeof(big_block));
@@ -46,9 +51,9 @@ void *kmalloc(uint64 size)
 		p_big_blocks = bigblock;
 
 		unlock(&kmalloc_lock);
+		memset(bigblock->pages, 0, size);
 		return bigblock->pages;
 	}
-
 	small_free(bigblock, sizeof(big_block));
 	return 0;
 }

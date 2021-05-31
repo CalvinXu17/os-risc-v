@@ -1,33 +1,56 @@
-#include "stdio.h"
-#include "stdlib.h"
+#include "syscall.h"
 #include "unistd.h"
+#include "stdio.h"
 
-size_t stack[1024] = {0};
-static int child_pid;
-
-static int child_func(void){
-    printf("  Child says successfully!\n");
-    return 0;
+int sys_test(const char *path)
+{
+    return __syscall(0, path);
 }
 
-void test_clone(void){
-    TEST_START(__func__);
-    int wstatus;
-    child_pid = clone(child_func, NULL, stack, 1024, SIGCHLD);
-    assert(child_pid != -1);
-    if (child_pid == 0){
-	exit(0);
-    }else{
-	if(wait(&wstatus) == child_pid)
-	    printf("clone process successfully.\npid:%d\n", child_pid);
-	else
-	    printf("clone process error.\n");
+char *paths[] = {"/clone",
+                "/exit",
+                "/fork",
+                "/getpid",
+                "/getppid",
+                "/gettimeofday",
+                "/uname",
+                "/wait",
+                "/sleep",
+                "/waitpid",
+                "/yield",
+                "/times",
+                "/getcwd",
+                "/chdir",
+                "/openat",
+                "/open",
+                "/read",
+                "/write",
+                "/close",
+                "/mkdir_",
+                "/pipe",
+                "/dup",
+                "/dup2",
+                "/getdents",
+                "/execve",
+                "/brk",
+                "/fstat",
+                "/unlink",
+                "/mount",
+                "/umount",
+                "/mmap",
+                "/munmap"};
+
+int main(void)
+{
+    int i;
+    for(i = 0; i < sizeof(paths); i++)
+    {
+        int pid = sys_test(paths[i]);
+        if(pid > 0)
+        {
+            waitpid(pid, 0, 0);
+        }
     }
-
-    TEST_END(__func__);
-}
-
-int main(void){
-    test_clone();
+    
     return 0;
 }

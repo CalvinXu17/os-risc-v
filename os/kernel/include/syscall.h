@@ -43,6 +43,14 @@ struct TimeVal
     uint64 usec; // 微秒数
 };
 
+struct tms              
+{                     
+	long tms_utime;  
+	long tms_stime;  
+	long tms_cutime; 
+	long tms_cstime; 
+};
+
 struct utsname {
 	char sysname[65];
 	char nodename[65];

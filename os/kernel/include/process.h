@@ -6,6 +6,7 @@
 #include "spinlock.h"
 #include "sem.h"
 #include "intr.h"
+#include "vfs.h"
 
 #define PROC_N  100
 
@@ -16,6 +17,8 @@
 #define PROC_SLEEP  4
 
 #define T_SLICE     50 // 默认时间片大小
+
+#define PROC_FILE_MAX 10
 
 struct proc_context
 {
@@ -60,6 +63,19 @@ struct Process
     
     void *data;
     spinlock lock;
+
+    uint64 start_time;
+    uint64 end_time;
+    uint64 utime_start;
+    uint64 stime_start;
+    uint64 utime;
+    uint64 stime;
+
+    vfs_dir_t *cwd;
+    list ufiles_list;
+    
+    void *minbrk;
+    void *brk;
 };
 
 #define status_list_node2proc(l)    GET_STRUCT_ENTRY(l, struct Process, status_list_node)
@@ -81,5 +97,9 @@ void user_init(int hartid);
 struct Process* new_proc(void);
 void free_process_mem(struct Process *proc);
 void free_process_struct(struct Process *proc);
+void* build_pgt(uint64 *pg0_t, uint64 page_begin_va, uint64 page_cnt);
+struct Process* create_proc_by_elf(char *absolute_path);
+void free_ufile_list(struct Process *p);
+void* userva2kernelva(uint64 *pgtva, uint64 uaddr);
 
 #endif
