@@ -77,32 +77,32 @@ LinanOS中进程PCB为```Process```结构体，保存进程的必要信息，结
 ```c
 struct Process
 {
-    uint64 *k_stack; // 内核栈
-    uint64 *pg_t; // 页表
+    uint64 *k_stack;              // 内核栈
+    uint64 *pg_t;                 // 页表
     struct trap_context tcontext; // 保存中断异常发生时的上下文
     struct proc_context pcontext; // 内核线程上下文
-    int32 pid;      // 进程id
-    int32 status; 	// 进程此时的状态
-    int64 t_wait;   // 进程休眠时间
-    int64 t_slice; 	// 进程时间片
-    char code;      // 保存进程exit的代码
-    struct semephore signal; // 父子进程通讯信号量
-    struct Process *parent;  // 父进程
-    list status_list_node;   // 就绪队列、等待队列等队列链接指针
-    list child_list_node;    // 子进程队列
-    list child_list;         // 用于链接到父进程子进程队列
-    void *data;	             // 暂存数据，用于存放信号量信息
-    spinlock lock;	         // 进程锁
-    uint64 start_time;       // 进程开始执行时的时间
-    uint64 end_time;         // 进程终止时的时间
-    uint64 utime_start;      // 用户态代码开始执行的时间
-    uint64 stime_start;      // 内核态代码开始执行的时间
-    uint64 utime;            // 用户态执行的时间
-    uint64 stime;            // 内核态执行的时间
-    vfs_dir_t *cwd;	         // 当前目录
-    list ufiles_list;        // 文件链表
-    void *minbrk;            // brk最小值
-    void *brk;               // brk指针
+    int32 pid;                    // 进程id
+    int32 status;                 // 进程此时的状态
+    int64 t_wait;                 // 进程休眠时间
+    int64 t_slice;                // 进程时间片
+    char code;                    // 保存进程exit的代码
+    struct semephore signal;      // 父子进程通讯信号量
+    struct Process *parent;       // 父进程
+    list status_list_node;        // 就绪队列、等待队列等队列链接指针
+    list child_list_node;         // 子进程队列
+    list child_list;              // 用于链接到父进程子进程队列
+    void *data;	                  // 暂存数据，用于存放信号量信息
+    spinlock lock;                // 进程锁
+    uint64 start_time;            // 进程开始执行时的时间
+    uint64 end_time;              // 进程终止时的时间
+    uint64 utime_start;           // 用户态代码开始执行的时间
+    uint64 stime_start;           // 内核态代码开始执行的时间
+    uint64 utime;                 // 用户态执行的时间
+    uint64 stime;                 // 内核态执行的时间
+    vfs_dir_t *cwd;               // 当前目录
+    list ufiles_list;             // 文件链表
+    void *minbrk;                 // brk最小值
+    void *brk;                    // brk指针
 };
 ```
 
