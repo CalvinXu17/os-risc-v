@@ -1309,7 +1309,7 @@ int sys_sleep(struct TimeVal *timein, struct TimeVal *timeout)
 }
 ```
 
-在时钟中断发生时，将会将time寄存器的值与```wait_list```中进程的```t_wait```进行比较，大于等于```t_wait```时将从```wai_list```中取出该进程加入到```ready_list```就绪队列中等待被调度，核心代码如下：
+在时钟中断发生时，将会将time寄存器的值与```wait_list```中进程的```t_wait```进行比较，大于等于```t_wait```时将从```wait_list```中取出该进程加入到```ready_list```就绪队列中等待被调度，核心代码如下：
 
 ```c
 list *w = wait_list.next;
