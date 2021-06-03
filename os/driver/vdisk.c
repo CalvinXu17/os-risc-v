@@ -204,18 +204,19 @@ int vdisk_read(uchar *buf, uint64 start_sector, uint64 count)
     disk.status[idx[0]] = 1; // 成功时该位会被virtio device置为0
     *R(VIRTIO_MMIO_QUEUE_NOTIFY_OFFSET) = 0; // value is queue number
     // Wait for virtio_disk_intr() to say request has finished.
+    int rt = 0;
     while(1)
     {
         if(*R(VIRTIO_MMIO_INTERRUPT_STATUS_OFFSET))
         {
             *R(VIRTIO_MMIO_INTERRUPT_ACK_OFFSET) = *R(VIRTIO_MMIO_INTERRUPT_STATUS_OFFSET) & 0x3;
-            if(disk.status[idx[0]] != 0) return 1;
+            if(disk.status[idx[0]] != 0) rt = 1;
             break;
         }
     }
     free_chain(idx[0]);
     unlock(&disk.vdisk_lock);
-    return 0;
+    return rt;
 }
 
 int vdisk_write(uchar *buf, uint64 start_sector, uint64 count)
@@ -273,18 +274,19 @@ int vdisk_write(uchar *buf, uint64 start_sector, uint64 count)
     *R(VIRTIO_MMIO_QUEUE_NOTIFY_OFFSET) = 0; // value is queue number
     
     // Wait for virtio_disk_intr() to say request has finished.
+    int rt = 0;
     while(1)
     {
         if(*R(VIRTIO_MMIO_INTERRUPT_STATUS_OFFSET))
         {
             *R(VIRTIO_MMIO_INTERRUPT_ACK_OFFSET) = *R(VIRTIO_MMIO_INTERRUPT_STATUS_OFFSET) & 0x3;
-            if(disk.status[idx[0]] != 0) return 1;
+            if(disk.status[idx[0]] != 0) rt = 1;
             break;
         }
     }
     free_chain(idx[0]);
     unlock(&disk.vdisk_lock);
-    return 0;
+    return rt;
 }
 
 void vdisk_intr()
