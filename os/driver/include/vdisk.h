@@ -2,6 +2,7 @@
 #define VDISK_H
 
 #include "type.h"
+#include "hal_sd.h"
 
 // https://docs.oasis-open.org/virtio/virtio/v1.1/virtio-v1.1.pdf
 
@@ -13,7 +14,9 @@
 #define VIRTIO_MMIO_DEVICE_ID_OFFSET		        0x008 // blk is 2, net is 1
 #define VIRTIO_MMIO_VENDOR_ID_OFFSET		        0x00c // 0x554d4551
 #define VIRTIO_MMIO_DEVICE_FEATURES_OFFSET	        0x010
+#define VIRTIO_MMIO_DEVICE_FEATURES_SEL_OFFSET	    0x014
 #define VIRTIO_MMIO_DRIVER_FEATURES_OFFSET	        0x020
+#define VIRTIO_MMIO_DRIVER_FEATURES_SEL_OFFSET      0x024
 #define VIRTIO_MMIO_GUEST_PAGE_SIZE_OFFSET	        0x028 // page size for PFN, write-only
 #define VIRTIO_MMIO_QUEUE_SEL_OFFSET		        0x030 // write, 选择virtual queue that follow options on QueueNumMax, QueueNum, QueueReady, QueueDescLow,QueueDescHigh, QueueAvailLow, QueueAvailHigh, QueueUsedLow andQueueUsedHigh apply to. The index number of the first queue is zero (0x0).
 #define VIRTIO_MMIO_QUEUE_NUM_MAX_OFFSET	        0x034 // read, max size of current queue
@@ -25,6 +28,8 @@
 #define VIRTIO_MMIO_INTERRUPT_STATUS_OFFSET	        0x060 // read
 #define VIRTIO_MMIO_INTERRUPT_ACK_OFFSET	        0x064 // write
 #define VIRTIO_MMIO_STATUS_OFFSET		            0x070 // read/write
+#define VIRTIO_MMIO_CONFIG_GENERATION_OFFSET		0x0fc // read
+#define VIRTIO_MMIO_CONFIG_OFFSET		            0x100 // read/write
 
 // status register bits, from qemu virtio_config.h
 #define VIRTIO_CONFIG_S_ACKNOWLEDGE	                1
@@ -99,9 +104,40 @@ typedef struct vring {
     vring_used_t *used;
 } vring_t;
 
+typedef struct virtio_blk_config {
+    uint64 capacity;
+    uint32 size_max;
+    uint32 seg_max;
+    struct virtio_blk_geometry {
+        uint16 cylinders;
+        uchar heads;
+        uchar sectors;
+    } geometry;
+    uint32 blk_size;
+    struct virtio_blk_topology {
+        // # of logical blocks per physical block (log2)
+        uchar physical_block_exp;
+        // offset of first aligned logical block
+        uchar alignment_offset;
+        // suggested minimum I/O size in blocks
+        uint16 min_io_size;
+        // optimal (suggested maximum) I/O size in blocks
+        uint32 opt_io_size;
+    } topology;
+    uchar writeback;
+    uchar unused0[3];
+    uint32 max_discard_sectors;
+    uint32 max_discard_seg;
+    uint32 discard_sector_alignment;
+    uint32 max_write_zeroes_sectors;
+    uint32 max_write_zeroes_seg;
+    uchar write_zeroes_may_unmap;
+    uchar unused1[3];
+}__attribute__((packed)) virtio_blk_config_t;
+
 int vdisk_init(void);
 int vdisk_read(uchar *buf, uint64 start_sector, uint64 count);
 int vdisk_write(uchar *buf, uint64 start_sector, uint64 count);
 void vdisk_intr(void);
-
+void vdisk_getinfo(hal_sd_info_t *info);
 #endif

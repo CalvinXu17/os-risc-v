@@ -201,7 +201,6 @@ int vdisk_read(uchar *buf, uint64 start_sector, uint64 count)
     disk.avail->idx = disk.avail->idx + 1;
 
     disk.avail->flags = 1;
-    disk.used->flags = 1;
     disk.status[idx[0]] = 1; // 成功时该位会被virtio device置为0
     *R(VIRTIO_MMIO_QUEUE_NOTIFY_OFFSET) = 0; // value is queue number
     // Wait for virtio_disk_intr() to say request has finished.
@@ -211,9 +210,6 @@ int vdisk_read(uchar *buf, uint64 start_sector, uint64 count)
         {
             *R(VIRTIO_MMIO_INTERRUPT_ACK_OFFSET) = *R(VIRTIO_MMIO_INTERRUPT_STATUS_OFFSET) & 0x3;
             if(disk.status[idx[0]] != 0) return 1;
-            //irq = plic_claim();
-            // printk("irq: %d\n", irq);
-            // plic_complete(DISK_IRQ);
             break;
         }
     }
@@ -273,7 +269,6 @@ int vdisk_write(uchar *buf, uint64 start_sector, uint64 count)
     disk.avail->idx = disk.avail->idx + 1;
     
     disk.avail->flags = 1;
-    disk.used->flags = 1;
     disk.status[idx[0]] = 1;
     *R(VIRTIO_MMIO_QUEUE_NOTIFY_OFFSET) = 0; // value is queue number
     
@@ -310,4 +305,14 @@ void vdisk_intr()
     // }
     *R(VIRTIO_MMIO_INTERRUPT_ACK_OFFSET) = *R(VIRTIO_MMIO_INTERRUPT_STATUS_OFFSET) & 0x3;
     unlock(&disk.vdisk_lock);
+}
+
+void vdisk_getinfo(hal_sd_info_t *info)
+{
+    virtio_blk_config_t *config = VIRTIO0_V + VIRTIO_MMIO_CONFIG_OFFSET;
+    info->blk_size = config->blk_size;
+    info->blk_num = config->capacity;
+    info->logical_blk_size = info->blk_size;
+    info->logical_blk_num = info->blk_num;
+    info->relative_card_addr = 0;
 }

@@ -70,9 +70,7 @@ int hal_sd_info_get(hal_sd_t *sd, hal_sd_info_t *info)
     info->logical_blk_num = info->blk_num;
     info->relative_card_addr = 0;
     #else
-    info->blk_size = 512;
-    info->logical_blk_size = 512;
-    info->relative_card_addr = 0;
+    vdisk_getinfo(info);
     #endif
     return 0;
 }

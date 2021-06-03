@@ -17,8 +17,11 @@ void plicinithart(void)
 {
     int hart = gethartid();
     #ifdef _QEMU
-    // set uart's enable bit for this hart's S-mode. 
-    *(uint32*)PLIC_SENABLE(hart)= (1 << UART_IRQ) | (1 << DISK_IRQ);
+    // set uart's enable bit for this hart's S-mode.
+    uint32 plic_enable = 0;
+    plic_enable |= (1 << UART_IRQ);  // 开uart外部中断
+    plic_enable &= !(1 << DISK_IRQ); // 关virtio disk外部中断，本系统不采用dma而采用轮询的方式读写disk
+    *(uint32*)PLIC_SENABLE(hart)= plic_enable;
     // set this hart's S-mode priority threshold to 0.
     *(uint32*)PLIC_SPRIORITY(hart) = 0;
     #else
