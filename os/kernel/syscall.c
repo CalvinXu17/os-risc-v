@@ -55,8 +55,12 @@ int sys_clone(uint flags, void *stack, int ptid, int tls, int ctid)
         
         p_pg0 = parent->pg_t;
         c_pg0 = kmalloc(PAGE_SIZE);
+        
+        c_pg0[508] = k_pg_t[508];
+        c_pg0[509] = k_pg_t[509];
+        c_pg0[510] = k_pg_t[510];
 
-        for(i = 0; i < 512; i++)
+        for(i = 0; i < 256; i++)
         {
             if(p_pg0[i] & PTE_V)
             {

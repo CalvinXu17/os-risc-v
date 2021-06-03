@@ -99,7 +99,7 @@ vfs_err_t vfs_fs_unregister(const char *fs_name)
 }
 
 /*
-    tos_vfs_mount("/dev/block/nand", "/fs/yaffs", "yaffs");
+    vfs_mount("/dev/block/nand", "/fs/yaffs", "yaffs");
     we mount a filesystem named "yaffs" to directory "fs/yaffs", using device "/dev/block/nand"
  */
 vfs_err_t vfs_fs_mount(const char *device_path, const char *dir, const char *fs_name)

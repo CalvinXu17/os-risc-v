@@ -38,7 +38,7 @@ void ext_intr_handler(struct trap_context *p)
         {
             #ifdef _DEBUG
             printk("SDCARD INTR\n");
-            #endif _DEBUG
+            #endif
 
         }
         #ifdef _DEBUG

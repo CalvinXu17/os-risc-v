@@ -7,10 +7,10 @@
 /* storage control modules to the FatFs module with a defined API.       */
 /*-----------------------------------------------------------------------*/
 
-#include "tos_ff.h"			/* Obtains integer types */
-#include "tos_diskio.h"		/* Declarations of disk functions */
+#include "ff.h"			/* Obtains integer types */
+#include "diskio.h"		/* Declarations of disk functions */
 
-DSTATUS tos_disk_status (
+DSTATUS disk_status (
 	vfs_inode_t *dev
 )
 {
@@ -37,7 +37,7 @@ DSTATUS tos_disk_status (
 /* Inidialize a Drive                                                    */
 /*-----------------------------------------------------------------------*/
 
-DSTATUS tos_disk_initialize (
+DSTATUS disk_initialize (
 	vfs_inode_t *dev
 )
 {
@@ -58,7 +58,7 @@ DSTATUS tos_disk_initialize (
 /* Read Sector(s)                                                        */
 /*-----------------------------------------------------------------------*/
 
-DRESULT tos_disk_read (
+DRESULT disk_read (
 	vfs_inode_t *dev,
 	BYTE *buff,		/* Data buffer to store read data */
 	DWORD sector,	/* Start sector in LBA */
@@ -84,7 +84,7 @@ DRESULT tos_disk_read (
 
 #if FF_FS_READONLY == 0
 
-DRESULT tos_disk_write (
+DRESULT disk_write (
 	vfs_inode_t *dev,
 	const BYTE *buff,	/* Data to be written */
 	DWORD sector,		/* Start sector in LBA */
@@ -109,7 +109,7 @@ DRESULT tos_disk_write (
 /* Miscellaneous Functions                                               */
 /*-----------------------------------------------------------------------*/
 
-DRESULT tos_disk_ioctl (
+DRESULT disk_ioctl (
 	vfs_inode_t *dev,
 	BYTE cmd,		/* Control code */
 	void *buff		/* Buffer to send/receive control data */

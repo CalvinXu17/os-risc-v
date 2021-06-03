@@ -1,4 +1,4 @@
-#include "tos_ff.h"
+#include "ff.h"
 #include "vfs.h"
 #include "kmalloc.h"
 #include "string.h"
@@ -47,7 +47,7 @@ static int fatfs_open(vfs_file_t *file, const char *pathname, vfs_oflag_t flags)
     fatfs = (FATFS *)file->inode->private;
     mode = fatfs_translate_oflag2mode(flags);
 
-    res = tos_f_open(fatfs, fp, pathname, mode);
+    res = f_open(fatfs, fp, pathname, mode);
     if (res != FR_OK) {
         return -1;
     }
@@ -63,7 +63,7 @@ static uint64 fatfs_read(vfs_file_t *file, void *buf, uint64 count)
 
     fp = (FIL *)file->private;
 
-    res = tos_f_read(fp, buf, count, &length);
+    res = f_read(fp, buf, count, &length);
     if (res != FR_OK) {
         return -1;
     }
@@ -79,7 +79,7 @@ static uint64 fatfs_write(vfs_file_t *file, const void *buf, uint64 count)
 
     fp = (FIL *)file->private;
 
-    res = tos_f_write(fp, buf, count, &length);
+    res = f_write(fp, buf, count, &length);
     if (res != FR_OK) {
         return -1;
     }
@@ -94,7 +94,7 @@ static int fatfs_close(vfs_file_t *file)
 
     fp = (FIL *)file->private;
 
-    res = tos_f_close(fp);
+    res = f_close(fp);
     if (res != FR_OK) {
         return -1;
     }
@@ -112,7 +112,7 @@ static vfs_off_t fatfs_lseek(vfs_file_t *file, vfs_off_t offset, vfs_whence_t wh
 
     fp = (FIL *)file->private;
 
-    res = tos_f_lseek(fp, offset);
+    res = f_lseek(fp, offset);
     if (res != FR_OK) {
         return -1;
     }
@@ -127,7 +127,7 @@ static int fatfs_sync(vfs_file_t *file)
 
     fp = (FIL *)file->private;
 
-    res = tos_f_sync(fp);
+    res = f_sync(fp);
     if (res != FR_OK) {
         return -1;
     }
@@ -142,7 +142,7 @@ static int fatfs_truncate(vfs_file_t *file, vfs_off_t length)
 
     fp = (FIL *)file->private;
 
-    res = tos_f_truncate(fp);
+    res = f_truncate(fp);
     if (res != FR_OK) {
         return -1;
     }
@@ -164,7 +164,7 @@ static int fatfs_opendir(vfs_dir_t *dir, const char *pathname)
     dir->private = dp;
     fatfs = (FATFS *)dir->inode->private;
 
-    res = tos_f_opendir(fatfs, dp, pathname);
+    res = f_opendir(fatfs, dp, pathname);
     if (res != FR_OK) {
         return -1;
     }
@@ -180,7 +180,7 @@ static int fatfs_closedir(vfs_dir_t *dir)
 
     dp = (DIR *)dir->private;
 
-    res = tos_f_closedir(dp);
+    res = f_closedir(dp);
     if (res != FR_OK) {
         return -1;
     }
@@ -221,7 +221,7 @@ static int fatfs_readdir(vfs_dir_t *dir, vfs_dirent_t *dirent)
     FRESULT res;
 
     dp = (DIR *)dir->private;
-    res = tos_f_readdir(dp, &info);
+    res = f_readdir(dp, &info);
     if (res != FR_OK) {
         return -1;
     }
@@ -238,7 +238,7 @@ static int fatfs_unlink(vfs_inode_t *fs, const char *pathname)
 
     fatfs = (FATFS *)fs->private;
 
-    res = tos_f_unlink(fatfs, pathname);
+    res = f_unlink(fatfs, pathname);
     if (res != FR_OK) {
         return -1;
     }
@@ -252,7 +252,7 @@ static int fatfs_mkdir(vfs_inode_t *fs, const char *pathname)
 
     fatfs = (FATFS *)fs->private;
 
-    res = tos_f_mkdir(fatfs, pathname);
+    res = f_mkdir(fatfs, pathname);
     if (res != FR_OK) {
         return -1;
     }
@@ -266,7 +266,7 @@ static int fatfs_rename(vfs_inode_t *fs, const char *oldpath, const char *newpat
 
     fatfs = (FATFS *)fs->private;
 
-    res = tos_f_rename(fatfs, oldpath, newpath);
+    res = f_rename(fatfs, oldpath, newpath);
     if (res != FR_OK) {
         return -1;
     }
@@ -365,7 +365,7 @@ static int fatfs_stat(vfs_inode_t *fs, const char *pathname, vfs_fstat_t *buf)
 
     fatfs = (FATFS *)fs->private;
 
-    res = tos_f_stat(fatfs, pathname, &info);
+    res = f_stat(fatfs, pathname, &info);
     if (res != FR_OK) {
         return -1;
     }
@@ -388,7 +388,7 @@ static int fatfs_bind(vfs_inode_t *fs, vfs_inode_t *dev)
     fatfs->pdrv = dev;
     fs->private = (void *)fatfs;
 
-    res = tos_f_mount(fatfs, 1);
+    res = f_mount(fatfs, 1);
     if (res != FR_OK) {
         return -1;
     }
@@ -402,7 +402,7 @@ static int fatfs_mkfs(vfs_inode_t *dev, int opt, unsigned long arg)
 {
     FRESULT res;
 
-    res = tos_f_mkfs(dev, opt, arg, workbuf, sizeof(workbuf));
+    res = f_mkfs(dev, opt, arg, workbuf, sizeof(workbuf));
     if (res != FR_OK) {
         return -1;
     }

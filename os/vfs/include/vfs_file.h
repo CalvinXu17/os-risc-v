@@ -28,7 +28,7 @@ typedef struct vfs_inode_st vfs_inode_t;
 // why your file path so deep?
 #define VFS_PATH_MAX                    32
 
-// open flags(vfs_oflag_t): open method flags (3rd argument of tos_vfs_open)
+// open flags(vfs_oflag_t): open method flags (3rd argument of vfs_open)
 #define VFS_OFLAG_READ              0x01
 #define VFS_OFLAG_WRITE             0x02
 #define VFS_OFLAG_EXISTING          0x00

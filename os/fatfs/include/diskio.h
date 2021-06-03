@@ -26,11 +26,11 @@ typedef enum {
 /* Prototypes for disk control functions */
 
 
-DSTATUS tos_disk_initialize (vfs_inode_t *dev);
-DSTATUS tos_disk_status (vfs_inode_t *dev);
-DRESULT tos_disk_read (vfs_inode_t *dev, BYTE* buff, DWORD sector, UINT count);
-DRESULT tos_disk_write (vfs_inode_t *dev, const BYTE* buff, DWORD sector, UINT count);
-DRESULT tos_disk_ioctl (vfs_inode_t *dev, BYTE cmd, void* buff);
+DSTATUS disk_initialize (vfs_inode_t *dev);
+DSTATUS disk_status (vfs_inode_t *dev);
+DRESULT disk_read (vfs_inode_t *dev, BYTE* buff, DWORD sector, UINT count);
+DRESULT disk_write (vfs_inode_t *dev, const BYTE* buff, DWORD sector, UINT count);
+DRESULT disk_ioctl (vfs_inode_t *dev, BYTE cmd, void* buff);
 
 
 /* Disk Status Bits (DSTATUS) */

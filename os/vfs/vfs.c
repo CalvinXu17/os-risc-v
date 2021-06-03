@@ -26,7 +26,7 @@ int vfs_open(const char *pathname, vfs_oflag_t flags)
     vfs_inode_t *inode = NULL;
 
     path_len = strlen(pathname);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return -VFS_ERR_PATH_TOO_LONG;
     }
 
@@ -360,7 +360,7 @@ VFS_DIR *vfs_opendir(const char *name)
     }
 
     path_len = strlen(name);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return NULL;
     }
 
@@ -509,7 +509,7 @@ int vfs_unlink(const char *pathname)
     vfs_inode_t *inode = NULL;
 
     path_len = strlen(pathname);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return -VFS_ERR_PATH_TOO_LONG;
     }
 
@@ -544,7 +544,7 @@ int vfs_mkdir(const char *pathname)
     vfs_inode_t *inode = NULL;
 
     path_len = strlen(pathname);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return -VFS_ERR_PATH_TOO_LONG;
     }
 
@@ -575,7 +575,7 @@ int vfs_rmdir(const char *pathname)
     vfs_inode_t *inode = NULL;
 
     path_len = strlen(pathname);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return -VFS_ERR_PATH_TOO_LONG;
     }
 
@@ -607,12 +607,12 @@ int vfs_rename(const char *oldpath, const char *newpath)
     vfs_inode_t *old_inode = NULL, *new_inode = NULL;
 
     path_len = strlen(oldpath);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return -VFS_ERR_PATH_TOO_LONG;
     }
 
     path_len = strlen(newpath);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return -VFS_ERR_PATH_TOO_LONG;
     }
 
@@ -651,13 +651,13 @@ int vfs_stat(const char *pathname, vfs_fstat_t *buf)
     char *relative_path = NULL;
     vfs_inode_t *inode = NULL;
 
-    // TOS_PTR_SANITY_CHECK(pathname);
+    // PTR_SANITY_CHECK(pathname);
     if (!buf) {
         return -VFS_ERR_BUFFER_NULL;
     }
 
     path_len = strlen(pathname);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return -VFS_ERR_PATH_TOO_LONG;
     }
 

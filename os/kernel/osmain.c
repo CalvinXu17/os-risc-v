@@ -6,16 +6,12 @@
 #include "slob.h"
 #include "plic.h"
 #include "console.h"
-#include "fpioa.h"
-#include "string.h"
 #include "process.h"
 #include "sched.h"
 #include "syscall.h"
 #include "fs.h"
-#include "vfs.h"
 
 static volatile int init_done = 0;
-
 
 void osmain(uint64 hartid)
 {
@@ -48,23 +44,14 @@ void osmain(uint64 hartid)
         }
         #endif
 
-        // int fd = vfs_open("/root/main.py", VFS_OFLAG_READ);
-        // if(fd < 0) panic("file open failed\n");
-
-        // printk("fd: %d\n", fd);
-        // char c;
-        // while(vfs_read(fd, &c, 1)==1)
-        // {
-        //     printk("%c", c);
-        // }
-
         sched_init();
         syscall_init();
         proc_init();
-        
+
         plicinit();
         plicinithart();
         intr_init();
+        
         user_init(hartid);
         for(int i=1;i < CPU_N; i++)
         {
@@ -79,6 +66,7 @@ void osmain(uint64 hartid)
         __sync_synchronize();
         plicinithart();
         intr_init();
+        user_init(hartid);
     }
     #ifdef _DEBUG
     if(hartid)

@@ -3,7 +3,6 @@
 #include "printk.h"
 
 struct proc_context sched_context[CPU_N]; // 保存scheduler调度器执行的上下文环境，切换到这里即切换到调度器运行
-uchar tmp[100];
 spinlock list_lock;
 list ready_list;
 list wait_list;

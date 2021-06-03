@@ -24,7 +24,7 @@ vfs_err_t vfs_block_device_register(const char *device_name, vfs_blkdev_ops_t *o
     vfs_inode_t *inode = NULL;
 
     path_len = strlen(device_name);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return VFS_ERR_PATH_TOO_LONG;
     }
 
@@ -54,7 +54,7 @@ vfs_err_t vfs_block_device_unregister(const char *device_name)
     vfs_inode_t *inode = NULL;
 
     path_len = strlen(device_name);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return VFS_ERR_PATH_TOO_LONG;
     }
 
@@ -81,7 +81,7 @@ vfs_err_t vfs_char_device_register(const char *device_name, vfs_chrdev_ops_t *op
     vfs_inode_t *inode = NULL;
 
     path_len = strlen(device_name);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return VFS_ERR_PATH_TOO_LONG;
     }
 
@@ -111,7 +111,7 @@ vfs_err_t vfs_char_device_unregister(const char *device_name)
     vfs_inode_t *inode = NULL;
 
     path_len = strlen(device_name);
-    if (path_len > TOS_CFG_VFS_PATH_MAX) {
+    if (path_len > VFS_PATH_MAX) {
         return VFS_ERR_PATH_TOO_LONG;
     }
 

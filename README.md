@@ -19,6 +19,7 @@ github仓库地址：[CalvinXu17/os-risc-v: os on risc-v (github.com)](https://g
 - [x] 运行ELF可执行文件
 - [x] 实现一组基础的系统调用
 - [x] 支持控制台串口输入、输出
+- [x] 支持在qemu运行
 
 ## TODO
 
@@ -30,7 +31,6 @@ github仓库地址：[CalvinXu17/os-risc-v: os on risc-v (github.com)](https://g
 - [ ] 线程的实现
 - [ ] 系统调用的完善
 - [ ] 设备管理
-- [ ] 实现在qemu运行
 ## 目录结构
 ![目录结构](./doc/1.jpg)
 - **build**

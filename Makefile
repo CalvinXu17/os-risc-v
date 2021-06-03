@@ -10,19 +10,16 @@ CFLAGS += -fno-builtin -nostdlib -nostdinc -fno-stack-protector -Wall
 
 KCFLAGS = $(CFLAGS) -O
 KCFLAGS += -I./os/kernel/include -I./os/driver/include -I./os/lib/include
-# KCFLAGS += -I./os/fat32/include -I./os/xfat/include
 KCFLAGS += -I./os/vfs/include -I./os/fatfs/include -I./os/hal/include
 KLFLAGS = $(LFLAGS)
 
-qemu: KCFLAGS += -D_QEMU
-qemu: KLFLAGS += -T ./qemu.ld
-KCFLAGS += -D_K210 # -D_DEBUG
-KLFLAGS += -T ./k210.ld
-
-all: buildos							   
-	cp ./sbi/k210/rustsbi-k210.bin ./build/k210.bin
-	dd if=./build/kernel.bin of=./build/k210.bin bs=128k seek=1
+all: k210
 	cp ./build/k210.bin ./k210.bin
+
+qemu: KCFLAGS += -D_QEMU # -D_DEBUG
+qemu: KLFLAGS += -T ./qemu.ld
+k210: KCFLAGS += -D_K210 # -D_DEBUG
+k210: KLFLAGS += -T ./k210.ld
 
 buildos:
 	$(CC) $(KCFLAGS) -c -o $(BUILD)boot.o ./os/kernel/boot.S
@@ -47,28 +44,15 @@ buildos:
 	$(CC) $(KCFLAGS) -c -o $(BUILD)printk.o ./os/kernel/printk.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)console.o ./os/kernel/console.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)string.o ./os/lib/string.c
-	
+
 	$(CC) $(KCFLAGS) -c -o $(BUILD)plic.o ./os/driver/plic.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)fpioa.o ./os/driver/fpioa.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)gpiohs.o ./os/driver/gpiohs.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)spi.o ./os/driver/spi.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)utils.o ./os/driver/utils.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)sdcard.o ./os/driver/sdcard.c
 
-	# $(CC) $(KCFLAGS) -c -o $(BUILD)xdisk.o ./os/xfat/xdisk.c
-	# $(CC) $(KCFLAGS) -c -o $(BUILD)xdriver.o ./os/xfat/xdriver.c
-	# $(CC) $(KCFLAGS) -c -o $(BUILD)xfat_buf.o ./os/xfat/xfat_buf.c
-	# $(CC) $(KCFLAGS) -c -o $(BUILD)xfat_obj.o ./os/xfat/xfat_obj.c
-	# $(CC) $(KCFLAGS) -c -o $(BUILD)xfat.o ./os/xfat/xfat.c
-
-
-
-	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_diskio.o ./os/fatfs/tos_diskio.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_fatfs_drv.o ./os/fatfs/tos_fatfs_drv.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_fatfs_vfs.o ./os/fatfs/tos_fatfs_vfs.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_ff.o ./os/fatfs/tos_ff.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_ffsystem.o ./os/fatfs/tos_ffsystem.c
-	$(CC) $(KCFLAGS) -c -o $(BUILD)tos_ffunicode.o ./os/fatfs/tos_ffunicode.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)diskio.o ./os/fatfs/diskio.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)fatfs_drv.o ./os/fatfs/fatfs_drv.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)fatfs_vfs.o ./os/fatfs/fatfs_vfs.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)ff.o ./os/fatfs/ff.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)ffsystem.o ./os/fatfs/ffsystem.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)ffunicode.o ./os/fatfs/ffunicode.c
 
 
 	$(CC) $(KCFLAGS) -c -o $(BUILD)vfs_device.o ./os/vfs/vfs_device.c
@@ -80,6 +64,13 @@ buildos:
 	$(CC) $(KCFLAGS) -c -o $(BUILD)hal_sd.o ./os/hal/hal_sd.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)fs.o ./os/kernel/fs.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)pipe.o ./os/kernel/pipe.c
+
+k210: buildos
+	$(CC) $(KCFLAGS) -c -o $(BUILD)fpioa.o ./os/driver/fpioa.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)gpiohs.o ./os/driver/gpiohs.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)spi.o ./os/driver/spi.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)utils.o ./os/driver/utils.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)sdcard.o ./os/driver/sdcard.c
 
 	$(CC) $(KLFLAGS) -o $(BUILD)kernel $(BUILD)boot.o \
 									   $(BUILD)intr_s.o \
@@ -100,20 +91,20 @@ buildos:
 									   $(BUILD)printk.o \
 									   $(BUILD)console.o \
 									   $(BUILD)plic.o \
+									   $(BUILD)string.o \
 									   $(BUILD)fpioa.o \
 									   $(BUILD)gpiohs.o \
 									   $(BUILD)spi.o \
 									   $(BUILD)utils.o \
 									   $(BUILD)sdcard.o \
-									   $(BUILD)string.o \
 									   \
 									   \
-									   $(BUILD)tos_diskio.o \
-									   $(BUILD)tos_fatfs_drv.o \
-									   $(BUILD)tos_fatfs_vfs.o \
-									   $(BUILD)tos_ff.o \
-									   $(BUILD)tos_ffsystem.o \
-									   $(BUILD)tos_ffunicode.o \
+									   $(BUILD)diskio.o \
+									   $(BUILD)fatfs_drv.o \
+									   $(BUILD)fatfs_vfs.o \
+									   $(BUILD)ff.o \
+									   $(BUILD)ffsystem.o \
+									   $(BUILD)ffunicode.o \
 									   \
 									   $(BUILD)vfs_device.o \
 									   $(BUILD)vfs_file.o \
@@ -128,6 +119,79 @@ buildos:
 									   
 	$(OBJCOPY) $(BUILD)kernel --strip-all -O binary $(BUILD)kernel.bin
 	$(NM) $(BUILD)/kernel | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > ./kernel.map
+	cp ./sbi/k210/rustsbi-k210.bin ./build/k210.bin
+	dd if=./build/kernel.bin of=./build/k210.bin bs=128k seek=1
+
+# build fs img
+# dd if=/dev/zero of=disk.img bs=3m count=1024
+# mkfs.vfat -F 32 disk.img
+mount:
+	sudo mount -o loop ./disk.img  /mnt/vdisk
+umount:
+	sudo umount /mnt/vdisk
+
+qemu: buildos
+	$(CC) $(KCFLAGS) -c -o $(BUILD)vdisk.o ./os/driver/vdisk.c
+
+	$(CC) $(KLFLAGS) -o $(BUILD)kernel $(BUILD)boot.o \
+									   $(BUILD)intr_s.o \
+									   $(BUILD)intr.o \
+									   $(BUILD)timer.o \
+									   $(BUILD)switch.o \
+									   $(BUILD)sched.o \
+									   $(BUILD)process.o \
+									   $(BUILD)syscall.o \
+									   $(BUILD)cpu.o \
+									   $(BUILD)page.o \
+									   $(BUILD)slob.o \
+									   $(BUILD)kmalloc.o \
+									   $(BUILD)osmain.o \
+									   $(BUILD)spinlock.o \
+									   $(BUILD)sem.o \
+									   $(BUILD)panic.o \
+									   $(BUILD)printk.o \
+									   $(BUILD)console.o \
+									   $(BUILD)plic.o \
+									   $(BUILD)string.o \
+									   \
+									   $(BUILD)vdisk.o \
+									   \
+									   \
+									   $(BUILD)diskio.o \
+									   $(BUILD)fatfs_drv.o \
+									   $(BUILD)fatfs_vfs.o \
+									   $(BUILD)ff.o \
+									   $(BUILD)ffsystem.o \
+									   $(BUILD)ffunicode.o \
+									   \
+									   $(BUILD)vfs_device.o \
+									   $(BUILD)vfs_file.o \
+									   $(BUILD)vfs_fs.o \
+									   $(BUILD)vfs_inode.o \
+									   $(BUILD)vfs.o \
+									   \
+									   $(BUILD)hal_sd.o \
+									   $(BUILD)fs.o \
+									   $(BUILD)pipe.o
+									   
+	$(OBJCOPY) $(BUILD)kernel --strip-all -O binary $(BUILD)kernel.bin
+	$(NM) $(BUILD)/kernel | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > ./kernel.map
+	-sudo umount /mnt/vdisk
+	rm -f ./disk.img
+	dd if=/dev/zero of=disk.img bs=1024k count=64
+	mkfs.vfat -F 32 disk.img
+	sudo mount -o loop ./disk.img  /mnt/vdisk
+	sudo cp -r /home/calvin/testsuits-for-oskernel/riscv-syscalls-testing/user/build/riscv64/* /mnt/vdisk/
+	-sudo umount /mnt/vdisk
+	qemu-system-riscv64 -machine virt \
+				-smp 2 \
+				-m 8M \
+				-nographic \
+				-bios ./sbi/qemu/rustsbi-qemu.bin \
+				-kernel $(BUILD)kernel.bin \
+				-drive file=disk.img,if=none,format=raw,id=x0 \
+				-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \
+				-device loader,file=$(BUILD)kernel.bin,addr=0x80200000
 
 UBUILD = $(BUILD)user/
 UCFLAGS = $(CFLAGS) -O -I./os/user/include
@@ -156,23 +220,6 @@ builduser:
 	cp $(UBUILD)app.bin $(WSL_WINPATH)app.bin
 	powershell.exe $(WINPATH)runbin.bat app
 
-# import virtual disk image
-# QEMUOPTS += -drive file=fs.img,if=none,format=raw,id=x0 
-# QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
-
-qemu: buildos
-	qemu-system-riscv64 -machine virt \
-				-smp 2 \
-				-m 8M \
-				-nographic \
-				-bios ./sbi/qemu/rustsbi-qemu.bin \
-				-kernel $(BUILD)kernel.bin \
-				-device loader,file=$(BUILD)kernel.bin,addr=0x80200000
-
-k210: buildos
-	cp ./sbi/k210/rustsbi-k210.bin ./build/k210.bin
-	dd if=./build/kernel.bin of=./build/k210.bin bs=128k seek=1
-
 run: k210
 	cp ./build/k210.bin $(WSL_WINPATH)k210.bin
 	powershell.exe $(WINPATH)run.bat
@@ -183,7 +230,8 @@ clean:
 cleanx:
 	rm -f ./build/*.o
 	rm -f ./build/*.bin
-	rm -f ./build/user/*
+	rm -f ./build/user/*.o
+	rm -f ./build/user/*.bin
 	rm -f ./build/kernel
 	rm -f ./build/app
 

@@ -33,7 +33,7 @@ loop:
 .section .data
 .align 12
 boot_stack:
-    .zero 4096 * 8 * mhartnum
+    .zero 4096 * mhartnum
 boot_stack_top:
 
 .globl k_pg_t

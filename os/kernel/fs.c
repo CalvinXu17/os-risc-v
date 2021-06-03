@@ -1,6 +1,6 @@
 #include "fs.h"
-#include "tos_fatfs_drv.h"
-#include "tos_fatfs_vfs.h"
+#include "fatfs_drv.h"
+#include "fatfs_vfs.h"
 #include "vfs.h"
 #include "printk.h"
 #include "string.h"
@@ -31,7 +31,7 @@ int fs_init(void)
         #endif
         return 0;
     }
-    err = vfs_fs_mount("/dev/sdcard", "", "vfat");
+    err = vfs_fs_mount("/dev/sdcard", "/root", "vfat");
     if(err != VFS_ERR_NONE)
     {
         #ifdef _DEBUG

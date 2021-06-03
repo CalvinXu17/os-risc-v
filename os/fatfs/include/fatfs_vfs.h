@@ -1,5 +1,5 @@
-#ifndef _TOS_FATFS_VFS_H_
-#define _TOS_FATFS_VFS_H_
+#ifndef _FATFS_VFS_H_
+#define _FATFS_VFS_H_
 
 #include "vfs.h"
 

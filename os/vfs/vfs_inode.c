@@ -74,7 +74,7 @@ static vfs_inode_t *vfs_inode_search(const char *path, const char **relative_pat
                 strncmp(name, path, name_len) == 0) {
                 /* for a filesystem, situation 4 */
                 if (relative_path) {
-                    *relative_path = NULL;
+                    *relative_path = &path[name_len];
                 }
                 return inode;
             } else if (path_len > name_len &&

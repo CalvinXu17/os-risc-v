@@ -3,7 +3,7 @@
 /* (C)ChaN, 2018                                                          */
 /*------------------------------------------------------------------------*/
 
-#include "tos_ff.h"
+#include "ff.h"
 #include "kmalloc.h"
 
 #if FF_USE_LFN == 3	/* Dynamic memory allocation */
@@ -12,7 +12,7 @@
 /* Allocate a memory block                                                */
 /*------------------------------------------------------------------------*/
 
-void* tos_ff_memalloc (	/* Returns pointer to the allocated memory block (null if not enough core) */
+void* ff_memalloc (	/* Returns pointer to the allocated memory block (null if not enough core) */
 	UINT msize		/* Number of bytes to allocate */
 )
 {
@@ -24,7 +24,7 @@ void* tos_ff_memalloc (	/* Returns pointer to the allocated memory block (null i
 /* Free a memory block                                                    */
 /*------------------------------------------------------------------------*/
 
-void tos_ff_memfree (
+void ff_memfree (
 	void* mblock	/* Pointer to the memory block to free (nothing to do if null) */
 )
 {

@@ -15,8 +15,8 @@
  * within TencentOS.
  *---------------------------------------------------------------------------*/
 
-#ifndef _TOS_VFS_H_
-#define  _TOS_VFS_H_
+#ifndef _VFS_H_
+#define  _VFS_H_
 
 #include "type.h"
 #include "vfs_err.h"
@@ -25,8 +25,6 @@
 #include "vfs_device.h"
 #include "vfs_fs.h"
 #include "vfs_inode.h"
-
-#define TOS_CFG_VFS_PATH_MAX        26
 
 int vfs_open(const char *pathname, vfs_oflag_t flags);
 
@@ -68,5 +66,5 @@ int vfs_rename(const char *oldpath, const char *newpath);
 
 int vfs_stat(const char *pathname, vfs_fstat_t *buf);
 
-#endif /* _TOS_VFS_H_ */
+#endif /* _VFS_H_ */
 
