@@ -1,20 +1,3 @@
-/*----------------------------------------------------------------------------
- * Tencent is pleased to support the open source community by making TencentOS
- * available.
- *
- * Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
- * If you have downloaded a copy of the TencentOS binary from Tencent, please
- * note that the TencentOS binary is licensed under the BSD 3-Clause License.
- *
- * If you have downloaded a copy of the TencentOS source code from Tencent,
- * please note that TencentOS source code is licensed under the BSD 3-Clause
- * License, except for the third-party components listed below which are
- * subject to different license terms. Your integration of TencentOS into your
- * own projects may require compliance with the BSD 3-Clause License, as well
- * as the other licenses applicable to the third-party components included
- * within TencentOS.
- *---------------------------------------------------------------------------*/
-
 #ifndef VFS_FILE_H
 #define VFS_FILE_H
 
@@ -29,13 +12,15 @@ typedef struct vfs_inode_st vfs_inode_t;
 #define VFS_PATH_MAX                    32
 
 // open flags(vfs_oflag_t): open method flags (3rd argument of vfs_open)
-#define VFS_OFLAG_READ              0x01
-#define VFS_OFLAG_WRITE             0x02
-#define VFS_OFLAG_EXISTING          0x00
-#define VFS_OFLAG_CREATE_NEW        0x04
-#define VFS_OFLAG_CREATE_ALWAYS     0x08
-#define VFS_OFLAG_OPEN_ALWAYS       0x10
-#define VFS_OFLAG_OPEN_APPEND       0x30
+#define O_ACCMODE       0003
+#define O_RDONLY        00
+#define O_WRONLY        01
+#define O_RDWR          02
+#define O_CREAT         0100
+#define O_TRUNC         01000
+#define O_EXCL          0200
+#define O_APPEND        02000
+#define O_DIRECTORY     0x0200000
 
 typedef enum vfs_whence_en {
     VFS_SEEK_SET,   /* the offset is set to offset bytes */
@@ -58,9 +43,27 @@ typedef enum vfs_type_en {
 } vfs_type_t;
 
 typedef enum vfs_mode_en {
-    VFS_MODE_READ_ONLY,
-    VFS_MODE_WRITE_ONLY,
-    VFS_MODE_READ_WRITE,
+    VFS_MODE_IFMT  = 0170000,
+    VFS_MODE_IFDIR = 0040000,
+    VFS_MODE_IFCHR = 0020000,
+    VFS_MODE_IFBLK = 0060000,
+    VFS_MODE_IFREG = 0100000,
+    VFS_MODE_IFLNK = 0120000,
+
+    VFS_MODE_IRUSR = 0400,
+    VFS_MODE_IWUSR = 0200,
+    VFS_MODE_IXUSR = 0100,
+    VFS_MODE_IRWXU = (VFS_MODE_IRUSR|VFS_MODE_IWUSR|VFS_MODE_IXUSR),
+
+    VFS_MODE_IRGRP = (VFS_MODE_IRUSR >> 3),
+    VFS_MODE_IWGRP = (VFS_MODE_IWUSR >> 3),
+    VFS_MODE_IXGRP = (VFS_MODE_IXUSR >> 3),
+    VFS_MODE_IRWXG = (VFS_MODE_IRWXU >> 3),
+
+    VFS_MODE_IROTH = (VFS_MODE_IRGRP >> 3),
+    VFS_MODE_IWOTH = (VFS_MODE_IWGRP >> 3),
+    VFS_MODE_IXOTH = (VFS_MODE_IXGRP >> 3),
+    VFS_MODE_IRWXO = (VFS_MODE_IRWXG >> 3),
 } vfs_mode_t;
 
 typedef struct vfs_file_stat_st {

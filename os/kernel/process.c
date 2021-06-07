@@ -529,7 +529,7 @@ struct Process* create_proc_by_elf(char *absolute_path)
 {
     if(!absolute_path) return NULL;
 
-    int fd = vfs_open(absolute_path, VFS_OFLAG_READ);
+    int fd = vfs_open(absolute_path, O_RDONLY);
     if(fd < 0)
     {
         #ifdef _DEBUG

@@ -1,20 +1,3 @@
-/*----------------------------------------------------------------------------
- * Tencent is pleased to support the open source community by making TencentOS
- * available.
- *
- * Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
- * If you have downloaded a copy of the TencentOS binary from Tencent, please
- * note that the TencentOS binary is licensed under the BSD 3-Clause License.
- *
- * If you have downloaded a copy of the TencentOS source code from Tencent,
- * please note that TencentOS source code is licensed under the BSD 3-Clause
- * License, except for the third-party components listed below which are
- * subject to different license terms. Your integration of TencentOS into your
- * own projects may require compliance with the BSD 3-Clause License, as well
- * as the other licenses applicable to the third-party components included
- * within TencentOS.
- *---------------------------------------------------------------------------*/
-
 #include "vfs.h"
 #include "string.h"
 
@@ -497,6 +480,49 @@ int vfs_statfs(const char *path, vfs_fsstat_t *buf)
 
     if (inode->ops.fs_ops->statfs) {
         ret = inode->ops.fs_ops->statfs(inode, buf);
+    }
+
+    return ret;
+}
+
+int vfs_link(const char *oldpath, const char *newpath)
+{
+    if(!oldpath || !newpath)
+    {
+        return -VFS_ERR_BUFFER_NULL;
+    }
+    int path_len_old, path_len_new, ret = -1;
+    char *relative_path_old = NULL;
+    char *relative_path_new = NULL;
+    vfs_inode_t *inode_old = NULL;
+    vfs_inode_t *inode_new = NULL;
+
+    path_len_old = strlen(oldpath);
+    path_len_new = strlen(newpath);
+    if (path_len_old > VFS_PATH_MAX || path_len_new > VFS_PATH_MAX) {
+        return -VFS_ERR_PATH_TOO_LONG;
+    }
+
+    if (oldpath[path_len_old - 1] == '/' || newpath[path_len_new - 1] == '/') {
+        return -VFS_ERR_PARA_INVALID;
+    }
+
+    inode_old = vfs_inode_find(oldpath, (const char **)&relative_path_old);
+    inode_new = vfs_inode_find(newpath, (const char **)&relative_path_new);
+    if (!inode_old || !inode_new) {
+        return -VFS_ERR_INODE_NOT_FOUND;
+    }
+
+    if (!VFS_INODE_IS_FILESYSTEM(inode_old) || !VFS_INODE_IS_FILESYSTEM(inode_new) || inode_old != inode_new) {
+        return -VFS_ERR_INODE_INVALID;
+    }
+
+    if (!relative_path_old || !relative_path_new) {
+        return -VFS_ERR_PARA_INVALID;
+    }
+
+    if (inode_old->ops.fs_ops->unlink) {
+        ret = inode_old->ops.fs_ops->link(inode_old, relative_path_old, relative_path_new);
     }
 
     return ret;

@@ -5,30 +5,37 @@
 
 static BYTE fatfs_translate_oflag2mode(vfs_oflag_t flags)
 {
-    BYTE mode = 0;
+    BYTE res      = 0;
+    BYTE acc_mode = flags & O_ACCMODE;
 
-    if (flags & VFS_OFLAG_READ) {
-        mode |= FA_READ;
+    if (acc_mode == O_RDONLY) {
+        res |= FA_READ;
+    } else if (acc_mode == O_WRONLY) {
+        res |= FA_WRITE;
+    } else if (acc_mode == O_RDWR) {
+        res |= FA_READ | FA_WRITE;
     }
-    if (flags & VFS_OFLAG_WRITE) {
-        mode |= FA_WRITE;
+
+    if (flags & O_CREAT) {
+        res |= FA_OPEN_ALWAYS;
     }
-    if (flags & VFS_OFLAG_EXISTING) {
-        mode |= FA_OPEN_EXISTING;
+
+    if (flags & O_TRUNC) {
+        res |= FA_CREATE_ALWAYS;
     }
-    if (flags & VFS_OFLAG_CREATE_NEW) {
-        mode |= FA_CREATE_NEW;
+
+    if (flags & O_EXCL) {
+        res |= FA_CREATE_NEW;
     }
-    if (flags & VFS_OFLAG_CREATE_ALWAYS) {
-        mode |= FA_CREATE_ALWAYS;
+
+    if (flags & O_APPEND) {
+        res |= FA_OPEN_APPEND;
     }
-    if (flags & VFS_OFLAG_OPEN_ALWAYS) {
-        mode |= FA_OPEN_ALWAYS;
+
+    if (res == 0) {
+        res |= FA_OPEN_EXISTING;
     }
-    if (flags & VFS_OFLAG_OPEN_APPEND) {
-        mode |= FA_OPEN_APPEND;
-    }
-    return mode;
+    return res;
 }
 
 static int fatfs_open(vfs_file_t *file, const char *pathname, vfs_oflag_t flags)
@@ -49,6 +56,8 @@ static int fatfs_open(vfs_file_t *file, const char *pathname, vfs_oflag_t flags)
 
     res = f_open(fatfs, fp, pathname, mode);
     if (res != FR_OK) {
+        file->private = NULL;
+        kfree(fp);
         return -1;
     }
 
@@ -166,6 +175,8 @@ static int fatfs_opendir(vfs_dir_t *dir, const char *pathname)
 
     res = f_opendir(fatfs, dp, pathname);
     if (res != FR_OK) {
+        dir->private = NULL;
+        kfree(dp);
         return -1;
     }
 
@@ -334,6 +345,7 @@ unsigned int fattime2unixtime(WORD time)
 
 static void fatfs_translate_filinfo2fstat(FILINFO *info, vfs_fstat_t *buf)
 {
+    buf->mode = 0;
     switch (info->fattrib) {
         case AM_DIR:
             buf->type = VFS_TYPE_DIRECTORY;
@@ -347,7 +359,7 @@ static void fatfs_translate_filinfo2fstat(FILINFO *info, vfs_fstat_t *buf)
             buf->type = VFS_TYPE_OTHER;
             break;
     }
-
+    buf->mode = VFS_MODE_IRWXU | VFS_MODE_IRWXG | VFS_MODE_IRWXO | ((info->fattrib & AM_DIR) ? VFS_MODE_IFDIR : VFS_MODE_IFREG);
     buf->size   = info->fsize;
     buf->atime  = fatdate2unixtime(info->adate);
     buf->mtime  = fatdate2unixtime(info->fdate) + fattime2unixtime(info->ftime);
@@ -390,6 +402,8 @@ static int fatfs_bind(vfs_inode_t *fs, vfs_inode_t *dev)
 
     res = f_mount(fatfs, 1);
     if (res != FR_OK) {
+        fs->private = NULL;
+        kfree(fatfs);
         return -1;
     }
 

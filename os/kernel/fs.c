@@ -2,6 +2,7 @@
 #include "fatfs_drv.h"
 #include "fatfs_vfs.h"
 #include "vfs.h"
+#include "cpu.h"
 #include "printk.h"
 #include "string.h"
 #include "process.h"
@@ -131,6 +132,41 @@ struct ufile* ufd2ufile(int ufd, struct Process *proc)
     return NULL;
 }
 
+int calc_abspath(vfs_dir_t *dir, char *path, char *abspath)
+{
+    if(path[0] == '/') // 绝对路径
+    {
+        strcpy(abspath, path);
+        return 0;
+    } else // 相对路径
+    {
+        if(!dir) return -1;
+        int len_filename = strlen(path);
+        int len_inode = strlen(dir->inode->name);
+        int len_relative = strlen(dir->relative_path);
+        if(len_inode + len_relative >= VFS_PATH_MAX) return -1;
+        strncpy(abspath, dir->inode->name, len_inode);
+        strncpy(abspath+len_inode, dir->relative_path, len_relative);
+
+        if(len_filename >= 2 && path[0]=='.' && path[1]=='/')
+        {
+            if(len_filename - 1 + len_inode + len_relative >= VFS_PATH_MAX) return -1;
+            strcpy(abspath+len_inode+len_relative, path+1);
+            return 0;
+        } else if(len_filename == 1 && path[0]=='.')
+        {
+            abspath[len_inode+len_relative] = 0;
+            return 1; // means open cwd dir
+        } else {
+            if(len_filename + len_inode + len_relative + 1 >= VFS_PATH_MAX) return -1;
+            abspath[len_inode+len_relative] = '/';
+            strcpy(abspath+len_inode+len_relative+1, path);
+            return 0;
+        }
+    }
+    return -1;
+}
+
 char* sys_getcwd(char *buf, int size)
 {
     if(!buf || size <= 1) return NULL;
@@ -142,9 +178,7 @@ char* sys_getcwd(char *buf, int size)
     if(delt < 0) return buf;
     strcpy(buf+leninode, proc->cwd->relative_path);
     if(!strlen(buf))
-    {
         buf[0] = '/';
-    }
     return buf;
 }
 
@@ -152,39 +186,13 @@ int sys_chdir(const char *dirpath)
 {
     if(!dirpath || !strlen(dirpath)) return -1;
 
-    char *path = NULL;
-    char abspath[VFS_PATH_MAX];
+    char abspath[VFS_PATH_MAX] = {0};
 
-    if(dirpath[0] == '/') // 绝对路径
-    {
-        path = dirpath;
-    } else // 相对路径
-    {
-        vfs_dir_t *dir = getcpu()->cur_proc->cwd;
-        
-        memset(abspath, 0, VFS_PATH_MAX);
-        int len_filename = strlen(dirpath);
-        int len_inode = strlen(dir->inode->name);
-        int len_relative = strlen(dir->relative_path);
-        if(len_inode + len_relative >= VFS_PATH_MAX) return -1;
-        strcpy(abspath, dir->inode->name);
-        strcpy(abspath+len_inode, dir->relative_path);
+    int rt = calc_abspath(getcpu()->cur_proc->cwd, dirpath, abspath);
 
-        if(len_filename >= 2 && dirpath[0]=='.' && dirpath[1]=='/')
-        {
-            if(len_filename - 1 + len_inode + len_relative >= VFS_PATH_MAX) return -1;
-            strcpy(abspath+len_inode+len_relative, dirpath+1);
-        } else if(len_filename == 1 && dirpath[0]=='.')
-        {
-            return 0;
-        } else {
-            if(len_filename + len_inode + len_relative + 1 >= VFS_PATH_MAX) return -1;
-            abspath[len_inode+len_relative] = '/';
-            strcpy(abspath+len_inode+len_relative+1, dirpath);
-        }
-        path = abspath;
-    }
-    vfs_dir_t *new_dir = vfs_opendir(path);
+    if(rt < 0) return -1;
+
+    vfs_dir_t *new_dir = vfs_opendir(abspath);
     if(!new_dir) return -1;
     vfs_closedir(getcpu()->cur_proc->cwd);
     getcpu()->cur_proc->cwd = new_dir;
@@ -194,56 +202,26 @@ int sys_chdir(const char *dirpath)
 int sys_openat(int ufd, char *filename, int flags, int mode)
 {
     if(!filename || !strlen(filename)) return -1;
-
-    char *path = NULL;
-    int iscwddir = 0;
-    char abspath[VFS_PATH_MAX];
+    
+    char abspath[VFS_PATH_MAX] = {0};
     vfs_dir_t *dir = NULL;
 
-    if(filename[0] == '/') // 绝对路径
+    if(ufd == AT_FDCWD) // 相对当前工作目录
     {
-        path = filename;
-    } else // 相对路径
+        dir = getcpu()->cur_proc->cwd;
+    } else // 相对fd
     {
-        if(ufd == AT_FDCWD) // 相对当前工作目录
-        {
-            dir = getcpu()->cur_proc->cwd;
-        } else // 相对fd
-        {
-            struct ufile *ufile = ufd2ufile(ufd, getcpu()->cur_proc);
-            if(!ufile) return -1;
-            if(ufile->type != UTYPE_DIR) return -1;
-            dir = ufile->private;
-        }
-        
-        memset(abspath, 0, VFS_PATH_MAX);
-        int len_filename = strlen(filename);
-        int len_inode = strlen(dir->inode->name);
-        int len_relative = strlen(dir->relative_path);
-        if(len_inode + len_relative >= VFS_PATH_MAX) return -1;
-        strncpy(abspath, dir->inode->name, len_inode);
-        strncpy(abspath+len_inode, dir->relative_path, len_relative);
-
-        if(len_filename >= 2 && filename[0]=='.' && filename[1]=='/')
-        {
-            if(len_filename - 1 + len_inode + len_relative >= VFS_PATH_MAX) return -1;
-            strcpy(abspath+len_inode+len_relative, filename+1);
-        } else if(len_filename == 1 && filename[0]=='.')
-        {
-            abspath[len_inode+len_relative] = 0;
-            dir = getcpu()->cur_proc->cwd;
-            iscwddir = 1;
-        } else {
-            if(len_filename + len_inode + len_relative + 1 >= VFS_PATH_MAX) return -1;
-            abspath[len_inode+len_relative] = '/';
-            strcpy(abspath+len_inode+len_relative+1, filename);
-        }
-        path = abspath;
+        struct ufile *ufile = ufd2ufile(ufd, getcpu()->cur_proc);
+        if(ufile && ufile->type == UTYPE_DIR) dir = ufile->private;
     }
 
-    if(iscwddir)
+    int rt = calc_abspath(dir, filename, abspath);
+
+    if(rt < 0) return -1;
+
+    if(rt == 1)
     {
-        dir = vfs_opendir(path);
+        dir = vfs_opendir(abspath);
         struct ufile *file = ufile_alloc(getcpu()->cur_proc);
         file->type = UTYPE_DIR;
         file->private = dir;
@@ -251,13 +229,13 @@ int sys_openat(int ufd, char *filename, int flags, int mode)
     }
     else if((flags & O_DIRECTORY)) //打开的是目录
     {
-        dir = vfs_opendir(path);
+        dir = vfs_opendir(abspath);
         if(!dir)
         {
-            if(!(flags & O_CREATE)) return -1;
-            int rt = vfs_mkdir(path);
+            if(!(flags & O_CREAT)) return -1;
+            int rt = vfs_mkdir(abspath);
             if(rt < 0) return -1;
-            dir = vfs_opendir(path);
+            dir = vfs_opendir(abspath);
             if(!dir) return -1;
         }
         struct ufile *file = ufile_alloc(getcpu()->cur_proc);
@@ -267,17 +245,8 @@ int sys_openat(int ufd, char *filename, int flags, int mode)
     }
     else // 打开的是文件
     {
-        int flag = VFS_OFLAG_READ;
-        if((flags & O_RDWR) || (flags & O_WRONLY)) flag |= VFS_OFLAG_WRITE;
-    
-        int fd = vfs_open(path, flag);
-        if(fd < 0)
-        {
-            if(!(flags & O_CREATE)) return -1;
-            flag |= (VFS_OFLAG_CREATE_ALWAYS | VFS_OFLAG_WRITE);
-            fd = vfs_open(path, flag);
-            if(fd < 0) return -1;
-        }
+        int fd = vfs_open(abspath, flags);
+        if(fd < 0) return -1;
         struct ufile *file = ufile_alloc(getcpu()->cur_proc);
         file->type = UTYPE_FILE;
         file->private = fd;
@@ -312,45 +281,22 @@ int sys_mkdirat(int dirfd, char *dirpath, int mode)
 {
     if(!dirpath || !strlen(dirpath)) return -1;
 
-    char *path = NULL;
-
-    if(dirpath[0] == '/') // 绝对路径
+    char abspath[VFS_PATH_MAX] = {0};
+    vfs_dir_t *dir = NULL;
+    if(dirfd == AT_FDCWD) // 相对当前工作目录
     {
-        path = dirpath;
-    } else // 相对路径
+        dir = getcpu()->cur_proc->cwd;
+    } else // 相对fd
     {
-        vfs_dir_t *dir = NULL;
-        if(dirfd == AT_FDCWD) // 相对当前工作目录
-        {
-            dir = getcpu()->cur_proc->cwd;
-        } else // 相对fd
-        {
-            struct ufile *ufile = ufd2ufile(dirfd, getcpu()->cur_proc);
-            if(!ufile) return -1;
-            if(ufile->type != UTYPE_DIR) return -1;
-            dir = ufile->private;
-        }
-        char abspath[VFS_PATH_MAX];
-        memset(abspath, 0, VFS_PATH_MAX);
-        int len_filename = strlen(dirpath);
-        int len_inode = strlen(dir->inode->name);
-        int len_relative = strlen(dir->relative_path);
-        if(len_inode + len_relative >= VFS_PATH_MAX) return -1;
-        strcpy(abspath, dir->inode->name);
-        strcpy(abspath+len_inode, dir->relative_path);
-
-        if(len_filename >= 2 && dirpath[0]=='.' && dirpath[1]=='/')
-        {
-            if(len_filename - 1 + len_inode + len_relative >= VFS_PATH_MAX) return -1;
-            strcpy(abspath+len_inode+len_relative, dirpath+1);
-        } else {
-            if(len_filename + len_inode + len_relative + 1 >= VFS_PATH_MAX) return -1;
-            abspath[len_inode+len_relative] = '/';
-            strcpy(abspath+len_inode+len_relative+1, dirpath);
-        }
-        path = abspath;
+        struct ufile *ufile = ufd2ufile(dirfd, getcpu()->cur_proc);
+        if(ufile && ufile->type == UTYPE_DIR) dir = ufile->private;
     }
-    if(!vfs_mkdir(path)) return 0;
+
+    int rt = calc_abspath(dir, dirpath, abspath);
+    
+    if(rt != 0) return -1;
+
+    if(!vfs_mkdir(abspath)) return 0;
     else return -1;
 }
 
@@ -596,38 +542,12 @@ int sys_execve(const char *name, char *const argv[], char *const argp[])
 {
     if(!name || !strlen(name)) return -1;
 
-    char *path = NULL;
-    char abspath[VFS_PATH_MAX];
+    char abspath[VFS_PATH_MAX] = {0};
 
-    if(name[0] == '/') // 绝对路径
-    {
-        path = name;
-    } else // 相对路径
-    {
-        vfs_dir_t *dir = getcpu()->cur_proc->cwd;
-        
-        memset(abspath, 0, VFS_PATH_MAX);
-        int len_filename = strlen(name);
-        int len_inode = strlen(dir->inode->name);
-        int len_relative = strlen(dir->relative_path);
-        if(len_inode + len_relative >= VFS_PATH_MAX) return -1;
-        strcpy(abspath, dir->inode->name);
-        strcpy(abspath+len_inode, dir->relative_path);
+    int rt = calc_abspath(getcpu()->cur_proc->cwd, name, abspath);
 
-        if(len_filename >= 2 && name[0]=='.' && name[1]=='/')
-        {
-            if(len_filename - 1 + len_inode + len_relative >= VFS_PATH_MAX) return -1;
-            strcpy(abspath+len_inode+len_relative, name+1);
-        } else if(len_filename == 1 && name[0]=='.')
-        {
-            return -1;
-        } else {
-            if(len_filename + len_inode + len_relative + 1 >= VFS_PATH_MAX) return -1;
-            abspath[len_inode+len_relative] = '/';
-            strcpy(abspath+len_inode+len_relative+1, name);
-        }
-        path = abspath;
-    }
+    if(rt != 0) return -1;
+
     struct Process *cur_proc = getcpu()->cur_proc;
     struct Process *new_proc = create_proc_by_elf(abspath);
     if(!new_proc) return -1;
@@ -718,7 +638,7 @@ int sys_fstat(int ufd, struct kstat *kst)
     if(vfs_stat(vfile->relative_path, &st) < 0) return -1;
     
     kst->st_dev = 1;
-    kst->st_mode = 0666;
+    kst->st_mode = st.mode;
     kst->st_nlink = 1;
     kst->st_uid = 0;
     kst->st_gid = 0;
@@ -739,57 +659,24 @@ int sys_unlinkat(int ufd, char *filename, int flags)
 {
     if(!filename || !strlen(filename)) return -1;
 
-    char *path = NULL;
-    int iscwddir = 0;
-    char abspath[VFS_PATH_MAX];
+    char abspath[VFS_PATH_MAX] = {0};
     vfs_dir_t *dir = NULL;
 
-    if(filename[0] == '/') // 绝对路径
+    if(ufd == AT_FDCWD) // 相对当前工作目录
     {
-        path = filename;
-    } else // 相对路径
+        dir = getcpu()->cur_proc->cwd;
+    } else // 相对fd
     {
-        if(ufd == AT_FDCWD) // 相对当前工作目录
-        {
-            dir = getcpu()->cur_proc->cwd;
-        } else // 相对fd
-        {
-            struct ufile *ufile = ufd2ufile(ufd, getcpu()->cur_proc);
-            if(!ufile) return -1;
-            if(ufile->type != UTYPE_DIR) return -1;
-            dir = ufile->private;
-        }
-        
-        memset(abspath, 0, VFS_PATH_MAX);
-        int len_filename = strlen(filename);
-        int len_inode = strlen(dir->inode->name);
-        int len_relative = strlen(dir->relative_path);
-        if(len_inode + len_relative >= VFS_PATH_MAX) return -1;
-        strncpy(abspath, dir->inode->name, len_inode);
-        strncpy(abspath+len_inode, dir->relative_path, len_relative);
-
-        if(len_filename >= 2 && filename[0]=='.' && filename[1]=='/')
-        {
-            if(len_filename - 1 + len_inode + len_relative >= VFS_PATH_MAX) return -1;
-            strcpy(abspath+len_inode+len_relative, filename+1);
-        } else if(len_filename == 1 && filename[0]=='.')
-        {
-            abspath[len_inode+len_relative] = 0;
-            dir = getcpu()->cur_proc->cwd;
-            iscwddir = 1;
-        } else {
-            if(len_filename + len_inode + len_relative + 1 >= VFS_PATH_MAX) return -1;
-            abspath[len_inode+len_relative] = '/';
-            strcpy(abspath+len_inode+len_relative+1, filename);
-        }
-        path = abspath;
+        struct ufile *ufile = ufd2ufile(ufd, getcpu()->cur_proc);
+        if(ufile && ufile->type == UTYPE_DIR) dir = ufile->private;
     }
 
-    if(iscwddir)
-    {
+    int rt = calc_abspath(dir, filename, abspath);
+
+    if(rt != 0)
         return -1;
-    }
-    else if(flags) //删除的是目录
+    
+    if(flags & O_DIRECTORY) //删除的是目录
     {
         if(!vfs_rmdir(abspath)) return 0;
         else return -1;
@@ -805,43 +692,16 @@ int sys_mount(const char *dev, const char *mntpoint, const char *fstype, unsigne
 {
     if(!dev || !mntpoint || !fstype) return -1;
 
-    char *path = NULL;
-    char abspath[VFS_PATH_MAX];
-    vfs_dir_t *dir = NULL;
+    char abspath[VFS_PATH_MAX] = {0};
 
-    if(mntpoint[0] == '/') // 绝对路径
-    {
-        path = mntpoint;
-    } else // 相对路径
-    {
-        dir = getcpu()->cur_proc->cwd;
-        memset(abspath, 0, VFS_PATH_MAX);
-        int len_filename = strlen(mntpoint);
-        int len_inode = strlen(dir->inode->name);
-        int len_relative = strlen(dir->relative_path);
-        if(len_inode + len_relative >= VFS_PATH_MAX) return -1;
-        strncpy(abspath, dir->inode->name, len_inode);
-        strncpy(abspath+len_inode, dir->relative_path, len_relative);
+    int rt = calc_abspath(getcpu()->cur_proc->cwd, mntpoint, abspath);
 
-        if(len_filename >= 2 && mntpoint[0]=='.' && mntpoint[1]=='/')
-        {
-            if(len_filename - 1 + len_inode + len_relative >= VFS_PATH_MAX) return -1;
-            strcpy(abspath+len_inode+len_relative, mntpoint+1);
-        } else if(len_filename == 1 && mntpoint[0]=='.')
-        {
-            return -1;
-        } else {
-            if(len_filename + len_inode + len_relative + 1 >= VFS_PATH_MAX) return -1;
-            abspath[len_inode+len_relative] = '/';
-            strcpy(abspath+len_inode+len_relative+1, mntpoint);
-        }
-        path = abspath;
-    }
+    if(rt != 0) return -1;
 
     vfs_err_t err;
     err = vfs_block_device_register(dev, &sd_dev);
     if(err != VFS_ERR_NONE && err != VFS_ERR_DEVICE_ALREADY_REGISTERED) return -1;
-    err = vfs_fs_mount(dev, path, fstype);
+    err = vfs_fs_mount(dev, abspath, fstype);
     if(err != VFS_ERR_NONE)
         return -1;
     return 0;
@@ -851,39 +711,13 @@ int sys_umount2(const char *mntpoint, unsigned long flags)
 {
     if(!mntpoint) return -1;
 
-    char *path = NULL;
-    char abspath[VFS_PATH_MAX];
-    vfs_dir_t *dir = NULL;
+    char abspath[VFS_PATH_MAX] = {0};
 
-    if(mntpoint[0] == '/') // 绝对路径
-    {
-        path = mntpoint;
-    } else // 相对路径
-    {
-        dir = getcpu()->cur_proc->cwd;
-        memset(abspath, 0, VFS_PATH_MAX);
-        int len_filename = strlen(mntpoint);
-        int len_inode = strlen(dir->inode->name);
-        int len_relative = strlen(dir->relative_path);
-        if(len_inode + len_relative >= VFS_PATH_MAX) return -1;
-        strncpy(abspath, dir->inode->name, len_inode);
-        strncpy(abspath+len_inode, dir->relative_path, len_relative);
+    int rt = calc_abspath(getcpu()->cur_proc->cwd, mntpoint, abspath);
 
-        if(len_filename >= 2 && mntpoint[0]=='.' && mntpoint[1]=='/')
-        {
-            if(len_filename - 1 + len_inode + len_relative >= VFS_PATH_MAX) return -1;
-            strcpy(abspath+len_inode+len_relative, mntpoint+1);
-        } else if(len_filename == 1 && mntpoint[0]=='.')
-        {
-            return -1;
-        } else {
-            if(len_filename + len_inode + len_relative + 1 >= VFS_PATH_MAX) return -1;
-            abspath[len_inode+len_relative] = '/';
-            strcpy(abspath+len_inode+len_relative+1, mntpoint);
-        }
-        path = abspath;
-    }
-    int rd = vfs_fs_umount(path);
+    if(rt != 0) return -1;
+
+    int rd = vfs_fs_umount(abspath);
     if(rd != 0) return -1;
     return 0;
 }
