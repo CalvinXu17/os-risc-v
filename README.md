@@ -195,6 +195,38 @@ vfs_fs_ops_t proc_fs = {
 
 在文件系统初始化时，将其挂载进VFS即可实现proc与etc目录下配置文件的读写，以此来适配busybox与lua测试程序的运行。
 
+### 测试
+
+`/os/user/app.c`即为测试程序的代码，分别执行busybox_testcode.sh以及lua_testcode.sh测试脚本，代码如下所示：
+
+```c
+#include "unistd.h"
+
+char *argvs1[] = {"./busybox", "sh", "./lua_testcode.sh", NULL};
+char *argvs2[] = {"./busybox", "sh", "./busybox_testcode.sh", NULL};
+char *envps[] = {"SHELL=shell", "PWD=/root", "HOME=/root", "USER=root", "SHLVL=1", "PATH=/root", "OLDPWD=/root", "_=busybox", NULL};
+
+int main(int argc, char *argv)
+{
+    int pid = fork();
+    if(pid)
+    {
+        waitpid(pid, 0, 0);
+        execve("./busybox", argvs2, envps);
+    } else {
+        execve("./busybox", argvs1, envps);
+    }
+    
+    return 0;
+}
+```
+
+该程序被编译好后与初赛一致，以**硬编码**的方式将其**二进制字节码**复制到`/os/kernel/process.c`中的`testdata[]`数组中，如下图所示：
+
+![app.c字节码](./doc/10.jpg)
+
+在初始化用户进程时，将数组中的字节码复制到1号用户进程中完成初始化，然后由调度程序调度运行1号程序执行测试脚本。
+
 ------
 
 ## 初赛阶段
