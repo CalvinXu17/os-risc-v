@@ -59,7 +59,9 @@ struct Process
     list status_list_node;
 
     list child_list_node;
-    list child_list;
+    list child_list_head;
+
+    list vma_list_head;
     
     void *data;
     spinlock lock;
@@ -72,14 +74,15 @@ struct Process
     uint64 stime;
 
     vfs_dir_t *cwd;
-    list ufiles_list;
+    int kfd;
+    list ufiles_list_head;
     
     void *minbrk;
     void *brk;
 };
 
 #define status_list_node2proc(l)    GET_STRUCT_ENTRY(l, struct Process, status_list_node)
-#define child_list2proc(l)          GET_STRUCT_ENTRY(l, struct Process, child_list)
+#define child_list_head2proc(l)          GET_STRUCT_ENTRY(l, struct Process, child_list_head)
 #define child_list_node2proc(l)     GET_STRUCT_ENTRY(l, struct Process, child_list_node)
 
 #define set_user_mode(p) ({ \
@@ -88,6 +91,35 @@ struct Process
     sstatus |= SPIE; \
     p->sstatus = sstatus; \
 })
+
+#define AT_NULL 0      /* end of vector */
+#define AT_IGNORE 1    /* entry should be ignored */
+#define AT_EXECFD 2    /* file descriptor of program */
+#define AT_PHDR 3      /* program headers for program */
+#define AT_PHENT 4     /* size of program header entry */
+#define AT_PHNUM 5     /* number of program headers */
+#define AT_PAGESZ 6    /* system page size */
+#define AT_BASE 7      /* base address of interpreter */
+#define AT_FLAGS 8     /* flags */
+#define AT_ENTRY 9     /* entry point of program */
+#define AT_NOTELF 10   /* program is not ELF */
+#define AT_UID 11      /* real uid */
+#define AT_EUID 12     /* effective uid */
+#define AT_GID 13      /* real gid */
+#define AT_EGID 14     /* effective gid */
+#define AT_PLATFORM 15 /* string identifying CPU for optimizations */
+#define AT_HWCAP 16    /* arch dependent hints at CPU capabilities */
+#define AT_CLKTCK 17   /* frequency at which times() increments */
+/* AT_* values 18 through 22 are reserved */
+#define AT_SECURE 23 /* secure mode boolean */
+#define AT_BASE_PLATFORM 24 /* string identifying real platform, may differ from AT_PLATFORM. */
+#define AT_RANDOM 25 /* address of 16 random bytes */
+
+#define AT_EXECFN 31 /* filename of program */
+
+#define AT_VECTOR_SIZE_BASE 19 /* ADD_AUXV entries in auxiliary table */
+/* number of "#define AT_.*" above, minus {AT_NULL, AT_IGNORE, AT_NOTELF} */
+
 
 void proc_init(void);
 int32 get_pid(void);
@@ -98,8 +130,9 @@ struct Process* new_proc(void);
 void free_process_mem(struct Process *proc);
 void free_process_struct(struct Process *proc);
 void* build_pgt(uint64 *pg0_t, uint64 page_begin_va, uint64 page_cnt);
-struct Process* create_proc_by_elf(char *absolute_path);
 void free_ufile_list(struct Process *p);
-void* userva2kernelva(uint64 *pgtva, uint64 uaddr);
+
+void print_user_stack(struct Process *proc);
+struct Process* create_proc_by_elf(char *absolute_path, char *const argv[], char *const envp[]);
 
 #endif

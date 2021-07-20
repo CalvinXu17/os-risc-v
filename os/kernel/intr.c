@@ -7,6 +7,7 @@
 #include "console.h"
 #include "syscall.h"
 #include "process.h"
+#include "vmm.h"
 
 static void ext_intr_init(void)
 {
@@ -88,6 +89,9 @@ void intr_handler(struct trap_context *p)
         #endif
         break;
     case INT_S_EXTERNAL:
+        #ifdef _DEBUG
+        printk("INT_S_EXTERNAL\n");
+        #endif
         #ifdef _QEMU
         ext_intr_handler(p);
         #endif
@@ -105,26 +109,52 @@ void exception_handler(struct trap_context *p)
     switch (p->scause)
     {
     case EXCPT_MISALIGNED_INST:
-        printk("EXCPT_MISALIGNED_INST\n");
+        #ifdef _DEBUG
+        //printk("EXCPT_MISALIGNED_INST 0x%lx, pc: 0x%lx\n", p->stval, p->sepc);
+        #endif
         break;
     case EXCPT_FAULT_EXE_INST:
-        printk("EXCPT_FAULT_EXE_INST\n");
+        #ifdef _DEBUG
+        //printk("EXCPT_FAULT_EXE_INST 0x%lx, pc: 0x%lx\n", p->stval, p->sepc);
+        #endif
+        #ifdef _K210
+        do_exec_fault(getcpu()->cur_proc, p->stval);
+        #endif
         break;
     case EXCPT_ILLEGAL_INST:
-        printk("EXCPT_ILLEGAL_INST\n");
+        #ifdef _DEBUG
+        //printk("EXCPT_ILLEGAL_INST 0x%lx, pc: 0x%lx\n", p->stval, p->sepc);
+        #endif
         break;
     case EXCPT_BREAKPOINT:
+        #ifdef _DEBUG
+        printk("EXCPT_BREAKPOINT 0x%lx, pc: 0x%lx\n", p->stval, p->sepc);
+        #endif
+        while(1) {}
         break;
     case EXCPT_MISALIGNED_LOAD:
-        printk("EXCPT_MISALIGNED_LOAD\n");
+        printk("EXCPT_MISALIGNED_LOAD 0x%lx, pc: 0x%lx\n", p->stval, p->sepc);
         break;
     case EXCPT_FAULT_LOAD:
-        printk("EXCPT_FAULT_LOAD 0x%lx\n", p->sbadvaddr);
+        #ifdef _DEBUG
+        //printk("EXCPT_FAULT_LOAD 0x%lx, pc: 0x%lx\n", p->stval, p->sepc);
+        #endif
+        #ifdef _K210
+        do_page_fault(getcpu()->cur_proc, p->stval);
+        #endif
         break;
     case EXCPT_MISALIGNED_STORE:
+        #ifdef _DEBUG
+        printk("EXCPT_MISALIGNED_STORE 0x%lx, pc: 0x%lx\n", p->stval, p->sepc);
+        #endif
         break;
     case EXCPT_FAULT_STORE:
-        printk("EXCPT_FAULT_STORE\n");
+        #ifdef _DEBUG
+        //printk("EXCPT_FAULT_STORE 0x%lx, pc: 0x%lx\n", p->stval, p->sepc);
+        #endif
+        #ifdef _K210
+        do_page_fault(getcpu()->cur_proc, p->stval);
+        #endif
         break;
     case EXCPT_U_ECALL:
         syscall_handler(p);
@@ -136,13 +166,28 @@ void exception_handler(struct trap_context *p)
     case EXCPT_M_ECALL:
         break;
     case EXCPT_INS_PAGE_FAULT:
-        printk("EXCPT_INS_PAGE_FAULT\n");
+        #ifdef _DEBUG
+        //printk("EXCPT_INS_PAGE_FAULT 0x%lx, pc: 0x%lx pid %lx\n", p->stval, p->sepc, getcpu()->cur_proc->pid);
+        #endif
+        #ifdef _QEMU
+        do_exec_fault(getcpu()->cur_proc, p->stval);
+        #endif
         break;
     case EXCPT_LOAD_PAGE_FAULT:
-        printk("EXCPT_LOAD_PAGE_FAULT\n");
+        #ifdef _DEBUG
+        //printk("EXCPT_LOAD_PAGE_FAULT 0x%lx, pc: 0x%lx\n", p->stval, p->sepc);
+        #endif
+        #ifdef _QEMU
+        do_page_fault(getcpu()->cur_proc, p->stval);
+        #endif
         break;
     case EXCPT_STORE_PAGE_FAULT:
-        printk("EXCPT_STORE_PAGE_FAULT\n");
+        #ifdef _DEBUG
+        //printk("EXCPT_STORE_PAGE_FAULT 0x%lx, pc: 0x%lx\n", p->stval, p->sepc);
+        #endif
+        #ifdef _QEMU
+        do_page_fault(getcpu()->cur_proc, p->stval);
+        #endif
         break;
     default:
         #ifdef _DEBUG
@@ -152,9 +197,13 @@ void exception_handler(struct trap_context *p)
     }
 }
 
-void trap_handler(struct trap_context *p)
+void trap_handler(struct trap_context *p, uint64 isfromuser)
 {
     struct Process *proc = getcpu()->cur_proc;
+    // #ifdef _DEBUG
+    // if(!isfromuser)
+    //     printk("\n\n\ntrap from kernel\n\n\n");
+    // #endif
     if(proc)
     {
         proc->stime_start = get_time();
@@ -174,4 +223,6 @@ void trap_handler(struct trap_context *p)
         proc->stime_start = 0;
         proc->utime_start = get_time();
     }
+    if(isfromuser)
+        set_sscratch(&proc->tcontext);  // 进入内核态后sscratch被置为0，用于区别是用户态还是内核态，trap返回前需恢复sscratch即&proc->tcontext
 }

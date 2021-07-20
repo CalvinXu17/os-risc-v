@@ -78,6 +78,9 @@ int vfs_close(int fd)
         return -VFS_ERR_FILE_NOT_OPEN;
     }
 
+    if(!file->inode)
+        return -VFS_ERR_INODE_NOT_FOUND;
+
     inode = file->inode;
 
     if (VFS_INODE_IS_FILESYSTEM(inode)) {
@@ -272,12 +275,21 @@ int vfs_dup(int oldfd)
 
     if (inode->ops.fs_ops->dup) {
         ret = inode->ops.fs_ops->dup(old_file, new_file);
+        if (ret < 0) {
+            vfs_file_free(new_file);
+        } else
+        {
+            ret = vfs_file2fd(new_file);
+        }
+    } else
+    {
+        ret = vfs_file2fd(new_file);
     }
-
+    
     if (ret < 0) {
         vfs_file_free(new_file);
     }
-
+    
     return ret;
 }
 

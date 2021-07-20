@@ -1,7 +1,12 @@
 #ifndef MM_H
 #define MM_H
 
+#ifdef _K210
 #define PM_SIZE  0x600000 // 6M
+#else
+#define PM_SIZE  0x600000
+#endif
+
 #define PM_START 0x80000000
 #define PM_END   (PM_START+PM_SIZE)
 

@@ -25,6 +25,7 @@ void osmain(uint64 hartid)
 
     if(hartid == 0) // 只允许一个cpu核执行的初始化操作
     {
+        init_done = 0;
         #ifdef _DEBUG
         printk("os init...\n");
         #endif
@@ -34,9 +35,7 @@ void osmain(uint64 hartid)
 
         if(!fs_init())
         {
-            #ifdef _DEBUG
             panic("fs init failed\n");
-            #endif
         }
         #ifdef _DEBUG 
         else {
@@ -53,13 +52,13 @@ void osmain(uint64 hartid)
         intr_init();
         
         user_init(hartid);
-        for(int i=1;i < CPU_N; i++)
-        {
-            uint64 mask = 1 << i;
-            sbi_send_ipi(&mask); // 启动其他的核
-        }
-        __sync_synchronize();
-        init_done = 1;
+        // for(int i=1;i < CPU_N; i++)
+        // {
+        //     uint64 mask = 1 << i;
+        //     sbi_send_ipi(&mask); // 启动其他的核
+        // }
+        // __sync_synchronize();
+        // init_done = 1;
     } else
     {
         while(!init_done) {}

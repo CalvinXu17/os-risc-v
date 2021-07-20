@@ -7,11 +7,11 @@ extern SD_CardInfo cardinfo;
 #include "vdisk.h"
 #endif
 
-int init = 0;
+volatile int is_sd_init = 0;
 int hal_sd_init(hal_sd_t *sd)
 {
-    if(init) return 0;
-    init = 1;
+    if(is_sd_init) return 0;
+    is_sd_init = 1;
     #ifdef _K210
     if(!sdcard_init())
     {

@@ -20,12 +20,12 @@ void* slob_get_pages(uint64 page_n)
 {
     Page *p = alloc_pages(page_n);
     if(!p) return 0;
-    else return (void*)get_vm_addr_by_page(p);
+    else return (void*)get_kvm_addr_by_page(p);
 }
 
 void slob_free_pages(uint64 va, uint64 page_n)
 {
-    free_pages(get_page_by_vm_addr(va), page_n);
+    free_pages(get_page_by_kvm_addr(va), page_n);
 }
 
 void* small_alloc(uint64 size) // 分配小内存

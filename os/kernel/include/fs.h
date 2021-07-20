@@ -30,7 +30,7 @@ struct kstat {
         uint32 st_uid;
         uint32 st_gid;
         uint64 st_rdev;
-        unsigned long __pad;
+        uint64 __pad;
         off_t st_size;
         uint32 st_blksize;
         int __pad2;
@@ -52,9 +52,43 @@ struct linux_dirent64 {
         char            d_name[];
 };
 
+struct iovec {
+    void   *iov_base;   /* 数据区的起始地址 */
+    uint64 iov_len;     /* 数据区的大小 */
+};
+
+struct pollfd
+{
+  int       fd;      /* File descriptor to poll.  */
+  short int events;  /* Types of events poller cares about.  */
+  short int revents; /* Types of events that actually occurred.  */
+};
+
+typedef struct {
+	int	val[2];
+} fsid_t;
+
+struct statfs
+{ 
+   long    f_type;     /* 文件系统类型  */ 
+   long    f_bsize;    /* 经过优化的传输块大小  */ 
+   long    f_blocks;   /* 文件系统数据块总数 */ 
+   long    f_bfree;    /* 可用块数 */ 
+   long    f_bavail;   /* 非超级用户可获取的块数 */ 
+   long    f_files;    /* 文件结点总数 */ 
+   long    f_ffree;    /* 可用文件结点数 */ 
+   fsid_t  f_fsid;     /* 文件系统标识 */ 
+   long    f_namelen;  /* 文件名的最大长度 */ 
+}; 
+
+#define POLLIN  01  /* There is data to read.  */
+#define POLLPRI 02  /* There is urgent data to read.  */
+#define POLLOUT 04  /* Writing now will not block.  */
+
 typedef enum ufile_type {
     UTYPE_STDIN,
     UTYPE_STDOUT,
+    UTYPE_STDERR,
     UTYPE_PIPEIN,
     UTYPE_PIPEOUT,
     UTYPE_LINK,
@@ -82,12 +116,22 @@ int sys_pipe2(int fd[2]);
 int sys_dup(int fd);
 int sys_dup2(int fd, int nfd);
 int sys_getdents64(int ufd, struct linux_dirent64 *buf, int len);
-int sys_execve(const char *name, char *const argv[], char *const argp[]);
+int sys_execve(const char *name, char *const argv[], char *const envp[]);
 int sys_fstat(int ufd, struct kstat *kst);
 int sys_unlinkat(int ufd, char *filename, int flags);
 int sys_mount(const char *dev, const char *mntpoint, const char *fstype, unsigned long flags, const void *data);
 int sys_umount2(const char *mntpoint, unsigned long flags);
 
+uint64 sys_readv(int ufd, struct iovec *iov, uint64 iovcnt);
+uint64 sys_writev(int ufd, struct iovec *iov, uint64 iovcnt);
+uint64 sys_readlinkat(int ufd, char *path, char *buf, uint64 bufsize);
+int sys_ioctl(int ufd, uint64 request);
+int sys_fcntl(int ufd);
+int sys_fstatat(int dirfd, const char *pathname, struct kstat *buf, int flags);
+int sys_ppoll(struct pollfd fds[10], int nfd, uint64 fds_addr);
+int sys_statfs(char *path, struct statfs *buf);
+int sys_syslog(int type, char *buf, int len);
+int sys_faccessat(int fd, const char *pathname, int mode, int flag);
 
 struct ufile* ufile_alloc(struct Process *proc);
 struct ufile* ufile_alloc_by_fd(int fd, struct Process *proc);

@@ -1,5 +1,6 @@
 #include "vfs.h"
 #include "kmalloc.h"
+#include "string.h"
 
 static vfs_file_t vfs_file_pool[VFS_FILE_OPEN_MAX] = { { NULL, 0 } };
 
@@ -59,7 +60,8 @@ vfs_file_t *vfs_file_dup(vfs_file_t *old_file)
     new_file->pos       = old_file->pos;
     new_file->inode     = old_file->inode;
     new_file->private   = old_file->private;
-
+    memcpy(new_file->relative_path, old_file->relative_path, VFS_PATH_MAX);
+    
     return new_file;
 }
 

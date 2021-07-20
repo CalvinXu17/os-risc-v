@@ -74,3 +74,41 @@ int console_write(const char *s, int len)
     unlock(&consbuf.mutex);
     return len;
 }
+
+static int vfs_console_open(vfs_file_t *file)
+{
+    return 0;
+}
+
+static int vfs_console_close(vfs_file_t *file)
+{
+    return 0;
+}
+
+static uint64 vfs_console_read(vfs_file_t *file, void *buf, uint64 count)
+{
+    return console_read(buf, count);
+}
+
+static uint64 vfs_console_write(vfs_file_t *file, const void *buf, uint64 count)
+{
+    return console_write(buf, count);
+}
+
+vfs_chrdev_ops_t stdin = {
+    .open = vfs_console_open,
+    .close = vfs_console_close,
+    .read = vfs_console_read,
+};
+
+vfs_chrdev_ops_t stdout = {
+    .open = vfs_console_open,
+    .close = vfs_console_close,
+    .write = vfs_console_write,
+};
+
+vfs_chrdev_ops_t stderr = {
+    .open = vfs_console_open,
+    .close = vfs_console_close,
+    .write = vfs_console_write,
+};

@@ -114,11 +114,11 @@ static int vprintf(const char *fmt, va_list ap)
 
 int printk(const char *fmt, ...) 
 {
-    lock(&printk_lock);
+    //lock(&printk_lock);
 	va_list ap;
 	va_start(ap, fmt);
 	int ret = vprintf(fmt, ap);
 	va_end(ap);
-    unlock(&printk_lock);
+    //unlock(&printk_lock);
 	return ret;
 }

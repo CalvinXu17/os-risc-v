@@ -6,7 +6,7 @@
 #include "sem.h"
 #include "fs.h"
 
-#define PIPE_BUFF_SIZE  512
+#define PIPE_BUFF_SIZE  1024
 
 typedef struct pipe {
     spinlock mutex;

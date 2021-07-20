@@ -6,11 +6,11 @@
 
 spinlock kmalloc_lock = {"kmalloc_lock", 0, 0};
 
-static uint64 align16(uint64 size)
+static uint64 align8(uint64 size)
 {
-    if((size & 0xf)==0)
+    if((size & 0x7)==0)
         return size;
-    else return ((size>>4)+1) << 4;
+    else return ((size>>3)+1) << 3;
 }
 
 static uint64 get_page_n(uint64 size)
@@ -24,7 +24,7 @@ void *kmalloc(uint64 size)
 {
 	small_block *m;
 	big_block *bigblock;
-    size = align16(size);
+    size = align8(size);
 	if (size < PAGE_SIZE - UNIT_SIZE)
 	{
 		m = small_alloc(size + UNIT_SIZE);
@@ -73,6 +73,7 @@ void kfree(void *addr)
 		{
 			if (bigblock->pages == addr)
 			{
+				memset(addr, 0, bigblock->page_n * PAGE_SIZE);
 				*last = bigblock->next;
 				unlock(&kmalloc_lock);
 				slob_free_pages((uint64)addr, bigblock->page_n);

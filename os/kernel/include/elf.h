@@ -37,7 +37,26 @@ struct proghdr {
 } __attribute__((__packed__));
 
 // Values for Proghdr type
+#define ELF_PROG_NULL           0
 #define ELF_PROG_LOAD           1
+#define ELF_PROG_DYNAMIC        2
+#define ELF_PROG_INTERP         3
+#define ELF_PROG_NOTE           4
+#define ELF_PROG_SHLIB          5
+#define ELF_PROG_PHDR           6
+#define ELF_PROG_TLS            7
+#define ELF_PROG_NUM            8
+#define ELF_PROG_LOOS           0x60000000
+#define ELF_PROG_GNU_EH_FRAME   0x6474e550
+#define ELF_PROG_GNU_STACK      0x6474e551
+#define ELF_PROG_GNU_RELRO      0x6474e552
+#define ELF_PROG_LOSUNW         0x6ffffffa
+#define ELF_PROG_SUNWBSS        0x6ffffffa
+#define ELF_PROG_SUNWSTACK      0x6ffffffb
+#define ELF_PROG_HISUNW         0x6fffffff
+#define ELF_PROG_HIOS           0x6fffffff
+#define ELF_PROG_LOPROC         0x70000000
+#define ELF_PROG_HIPROC         0x7fffffff
 
 // Flag bits for Proghdr flags
 #define ELF_PROG_FLAG_EXEC      1

@@ -125,7 +125,7 @@ static inline uint64 get_mcause(void)
 
 static inline uint64 get_time(void)
 {
-    uint64 rt;
+    register uint64 rt asm("a0");
     asm volatile("csrr %0, time" : "=r"(rt));
     return rt;
 }
@@ -342,6 +342,9 @@ void cpu_init(uint64 hartid);
 #define PTE_X (1L << 3)
 #define PTE_U (1L << 4)
 #define PTE_G (1L << 5)
+
+#define PTE_F (1L << 8) // fork
+#define PTE_S (1L << 9) // share
 
 #define PA2PTE(pa) (((uint64)(pa)>>12)<<10)
 #define PTE2PA(pa) (((uint64)(pa)>>10)<<12)

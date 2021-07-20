@@ -1,664 +1,357 @@
 #include "syscall.h"
 #include "printk.h"
+#include "intr.h"
 #include "process.h"
-#include "sched.h"
-#include "console.h"
-#include "string.h"
-#include "page.h"
-#include "kmalloc.h"
-#include "timer.h"
-#include "fs.h"
-#include "pipe.h"
-#include "page.h"
+#include "cpu.h"
 
 void* syscall_table[SYS_NR];
 
+#ifdef _STRACE
+char* syscall_name[SYS_NR];
+#endif
+
 void syscall_handler(struct trap_context *context)
 {
-    int (*syscall)(struct trap_context *);
-    syscall = syscall_table[context->a7];
-    context->a0 = syscall(context);
+    uint64 a0;
+    a0 = context->a0;
+    if(context->a7 >=0 && context->a7 < SYS_NR)
+    {
+        int (*syscall)(struct trap_context *);
+        syscall = syscall_table[context->a7];
+        syscall(context);
+    } else
+    {
+        #ifdef _DEBUG
+        printk("out of index\n");
+        #endif
+        context->a0 = -1;
+    }
+    #ifdef _STRACE
+    if((int)context->a0 < 0)
+    {
+        printk("pid %d pc: %lx %s(%lx, %lx, %lx, %lx, %lx, %lx) = %lx\n", getcpu()->cur_proc->pid, context->sepc, syscall_name[context->a7], a0, context->a1, context->a2, context->a3, context->a4, context->a5, context->a0);
+    }
+    #endif
 }
 
 void unknown_syscall(struct trap_context *context)
 {
     #ifdef _DEBUG
-    printk("unknown syscall %d!\n", context->a7);
+    // printk("unknown syscall %d!\n", context->a7);
     #endif
+    context->a0 = -1;
 }
+
+#ifdef _STRACE
+void set_syscall_name()
+{
+    int i;
+    for(i=0;i<SYS_NR;i++)
+    {
+        syscall_name[i] = "unknown";
+    }
+    SET_SYSCALL_NAME(io_setup);
+    SET_SYSCALL_NAME(io_destroy);
+    SET_SYSCALL_NAME(io_submit);
+    SET_SYSCALL_NAME(io_cancel);
+    SET_SYSCALL_NAME(io_getevents);
+    SET_SYSCALL_NAME(setxattr);
+    SET_SYSCALL_NAME(lsetxattr);
+    SET_SYSCALL_NAME(fsetxattr);
+    SET_SYSCALL_NAME(getxattr);
+    SET_SYSCALL_NAME(lgetxattr);
+    SET_SYSCALL_NAME(fgetxattr);
+    SET_SYSCALL_NAME(listxattr);
+    SET_SYSCALL_NAME(llistxattr);
+    SET_SYSCALL_NAME(flistxattr);
+    SET_SYSCALL_NAME(removexattr);
+    SET_SYSCALL_NAME(lremovexattr);
+    SET_SYSCALL_NAME(fremovexattr);
+    SET_SYSCALL_NAME(getcwd);
+    SET_SYSCALL_NAME(lookup_dcookie);
+    SET_SYSCALL_NAME(eventfd2);
+    SET_SYSCALL_NAME(epoll_create1);
+    SET_SYSCALL_NAME(epoll_ctl);
+    SET_SYSCALL_NAME(epoll_pwait);
+    SET_SYSCALL_NAME(dup);
+    SET_SYSCALL_NAME(dup3);
+    SET_SYSCALL_NAME(fcntl);
+    SET_SYSCALL_NAME(inotify_init1);
+    SET_SYSCALL_NAME(inotify_add_watch);
+    SET_SYSCALL_NAME(inotify_rm_watch);
+    SET_SYSCALL_NAME(ioctl);
+    SET_SYSCALL_NAME(ioprio_set);
+    SET_SYSCALL_NAME(ioprio_get);
+    SET_SYSCALL_NAME(flock);
+    SET_SYSCALL_NAME(mknodat);
+    SET_SYSCALL_NAME(mkdirat);
+    SET_SYSCALL_NAME(unlinkat);
+    SET_SYSCALL_NAME(symlinkat);
+    SET_SYSCALL_NAME(linkat);
+    SET_SYSCALL_NAME(umount2);
+    SET_SYSCALL_NAME(mount);
+    SET_SYSCALL_NAME(pivot_root);
+    SET_SYSCALL_NAME(nfsservctl);
+    SET_SYSCALL_NAME(statfs);
+    SET_SYSCALL_NAME(fstatfs);
+    SET_SYSCALL_NAME(truncate);
+    SET_SYSCALL_NAME(ftruncate);
+    SET_SYSCALL_NAME(fallocate);
+    SET_SYSCALL_NAME(faccessat);
+    SET_SYSCALL_NAME(chdir);
+    SET_SYSCALL_NAME(fchdir);
+    SET_SYSCALL_NAME(chroot);
+    SET_SYSCALL_NAME(fchmod);
+    SET_SYSCALL_NAME(fchmodat);
+    SET_SYSCALL_NAME(fchownat);
+    SET_SYSCALL_NAME(fchown);
+    SET_SYSCALL_NAME(openat);
+    SET_SYSCALL_NAME(close);
+    SET_SYSCALL_NAME(vhangup);
+    SET_SYSCALL_NAME(pipe2);
+    SET_SYSCALL_NAME(quotactl);
+    SET_SYSCALL_NAME(getdents64);
+    SET_SYSCALL_NAME(lseek);
+    SET_SYSCALL_NAME(read);
+    SET_SYSCALL_NAME(write);
+    SET_SYSCALL_NAME(readv);
+    SET_SYSCALL_NAME(writev);
+    SET_SYSCALL_NAME(pread64);
+    SET_SYSCALL_NAME(pwrite64);
+    SET_SYSCALL_NAME(preadv);
+    SET_SYSCALL_NAME(pwritev);
+    SET_SYSCALL_NAME(sendfile);
+    SET_SYSCALL_NAME(pselect6);
+    SET_SYSCALL_NAME(ppoll);
+    SET_SYSCALL_NAME(signalfd4);
+    SET_SYSCALL_NAME(vmsplice);
+    SET_SYSCALL_NAME(splice);
+    SET_SYSCALL_NAME(tee);
+    SET_SYSCALL_NAME(readlinkat);
+    SET_SYSCALL_NAME(fstatat);
+    SET_SYSCALL_NAME(fstat);
+    SET_SYSCALL_NAME(sync);
+    SET_SYSCALL_NAME(fsync);
+    SET_SYSCALL_NAME(fdatasync);
+    SET_SYSCALL_NAME(sync_file_range);
+    SET_SYSCALL_NAME(timerfd_create);
+    SET_SYSCALL_NAME(timerfd_settime);
+    SET_SYSCALL_NAME(timerfd_gettime);
+    SET_SYSCALL_NAME(utimensat);
+    SET_SYSCALL_NAME(acct);
+    SET_SYSCALL_NAME(capget);
+    SET_SYSCALL_NAME(capset);
+    SET_SYSCALL_NAME(personality);
+    SET_SYSCALL_NAME(exit);
+    SET_SYSCALL_NAME(exit_group);
+    SET_SYSCALL_NAME(waitid);
+    SET_SYSCALL_NAME(set_tid_address);
+    SET_SYSCALL_NAME(unshare);
+    SET_SYSCALL_NAME(futex);
+    SET_SYSCALL_NAME(set_robust_list);
+    SET_SYSCALL_NAME(get_robust_list);
+    SET_SYSCALL_NAME(nanosleep);
+    SET_SYSCALL_NAME(getitimer);
+    SET_SYSCALL_NAME(setitimer);
+    SET_SYSCALL_NAME(kexec_load);
+    SET_SYSCALL_NAME(init_module);
+    SET_SYSCALL_NAME(delete_module);
+    SET_SYSCALL_NAME(timer_create);
+    SET_SYSCALL_NAME(timer_gettime);
+    SET_SYSCALL_NAME(timer_getoverrun);
+    SET_SYSCALL_NAME(timer_settime);
+    SET_SYSCALL_NAME(timer_delete);
+    SET_SYSCALL_NAME(clock_settime);
+    SET_SYSCALL_NAME(clock_gettime);
+    SET_SYSCALL_NAME(clock_getres);
+    SET_SYSCALL_NAME(clock_nanosleep);
+    SET_SYSCALL_NAME(syslog);
+    SET_SYSCALL_NAME(ptrace);
+    SET_SYSCALL_NAME(sched_setparam);
+    SET_SYSCALL_NAME(sched_setscheduler);
+    SET_SYSCALL_NAME(sched_getscheduler);
+    SET_SYSCALL_NAME(sched_getparam);
+    SET_SYSCALL_NAME(sched_setaffinity);
+    SET_SYSCALL_NAME(sched_getaffinity);
+    SET_SYSCALL_NAME(sched_yield);
+    SET_SYSCALL_NAME(sched_get_priority_max);
+    SET_SYSCALL_NAME(sched_get_priority_min);
+    SET_SYSCALL_NAME(sched_rr_get_interval);
+    SET_SYSCALL_NAME(restart_syscall);
+    SET_SYSCALL_NAME(kill);
+    SET_SYSCALL_NAME(tkill);
+    SET_SYSCALL_NAME(tgkill);
+    SET_SYSCALL_NAME(sigaltstack);
+    SET_SYSCALL_NAME(rt_sigsuspend);
+    SET_SYSCALL_NAME(rt_sigaction);
+    SET_SYSCALL_NAME(rt_sigprocmask);
+    SET_SYSCALL_NAME(rt_sigpending);
+    SET_SYSCALL_NAME(rt_sigtimedwait);
+    SET_SYSCALL_NAME(rt_sigqueueinfo);
+    SET_SYSCALL_NAME(rt_sigreturn);
+    SET_SYSCALL_NAME(setpriority);
+    SET_SYSCALL_NAME(getpriority);
+    SET_SYSCALL_NAME(reboot);
+    SET_SYSCALL_NAME(setregid);
+    SET_SYSCALL_NAME(setgid);
+    SET_SYSCALL_NAME(setreuid);
+    SET_SYSCALL_NAME(setuid);
+    SET_SYSCALL_NAME(setresuid);
+    SET_SYSCALL_NAME(getresuid);
+    SET_SYSCALL_NAME(setresgid);
+    SET_SYSCALL_NAME(getresgid);
+    SET_SYSCALL_NAME(setfsuid);
+    SET_SYSCALL_NAME(setfsgid);
+    SET_SYSCALL_NAME(times);
+    SET_SYSCALL_NAME(time);
+    SET_SYSCALL_NAME(setpgid);
+    SET_SYSCALL_NAME(getpgid);
+    SET_SYSCALL_NAME(getsid);
+    SET_SYSCALL_NAME(setsid);
+    SET_SYSCALL_NAME(getgroups);
+    SET_SYSCALL_NAME(setgroups);
+    SET_SYSCALL_NAME(uname);
+    SET_SYSCALL_NAME(sethostname);
+    SET_SYSCALL_NAME(setdomainname);
+    SET_SYSCALL_NAME(getrlimit);
+    SET_SYSCALL_NAME(setrlimit);
+    SET_SYSCALL_NAME(getrusage);
+    SET_SYSCALL_NAME(umask);
+    SET_SYSCALL_NAME(prctl);
+    SET_SYSCALL_NAME(getcpu);
+    SET_SYSCALL_NAME(gettimeofday);
+    SET_SYSCALL_NAME(settimeofday);
+    SET_SYSCALL_NAME(adjtimex);
+    SET_SYSCALL_NAME(getpid);
+    SET_SYSCALL_NAME(getppid);
+    SET_SYSCALL_NAME(getuid);
+    SET_SYSCALL_NAME(geteuid);
+    SET_SYSCALL_NAME(getgid);
+    SET_SYSCALL_NAME(getegid);
+    SET_SYSCALL_NAME(gettid);
+    SET_SYSCALL_NAME(sysinfo);
+    SET_SYSCALL_NAME(mq_open);
+    SET_SYSCALL_NAME(mq_unlink);
+    SET_SYSCALL_NAME(mq_timedsend);
+    SET_SYSCALL_NAME(mq_timedreceive);
+    SET_SYSCALL_NAME(mq_notify);
+    SET_SYSCALL_NAME(mq_getsetattr);
+    SET_SYSCALL_NAME(msgget);
+    SET_SYSCALL_NAME(msgctl);
+    SET_SYSCALL_NAME(msgrcv);
+    SET_SYSCALL_NAME(msgsnd);
+    SET_SYSCALL_NAME(semget);
+    SET_SYSCALL_NAME(semctl);
+    SET_SYSCALL_NAME(semtimedop);
+    SET_SYSCALL_NAME(semop);
+    SET_SYSCALL_NAME(shmget);
+    SET_SYSCALL_NAME(shmctl);
+    SET_SYSCALL_NAME(shmat);
+    SET_SYSCALL_NAME(shmdt);
+    SET_SYSCALL_NAME(socket);
+    SET_SYSCALL_NAME(socketpair);
+    SET_SYSCALL_NAME(bind);
+    SET_SYSCALL_NAME(listen);
+    SET_SYSCALL_NAME(accept);
+    SET_SYSCALL_NAME(connect);
+    SET_SYSCALL_NAME(getsockname);
+    SET_SYSCALL_NAME(getpeername);
+    SET_SYSCALL_NAME(sendto);
+    SET_SYSCALL_NAME(recvfrom);
+    SET_SYSCALL_NAME(setsockopt);
+    SET_SYSCALL_NAME(getsockopt);
+    SET_SYSCALL_NAME(shutdown);
+    SET_SYSCALL_NAME(sendmsg);
+    SET_SYSCALL_NAME(recvmsg);
+    SET_SYSCALL_NAME(readahead);
+    SET_SYSCALL_NAME(brk);
+    SET_SYSCALL_NAME(munmap);
+    SET_SYSCALL_NAME(mremap);
+    SET_SYSCALL_NAME(add_key);
+    SET_SYSCALL_NAME(request_key);
+    SET_SYSCALL_NAME(keyctl);
+    SET_SYSCALL_NAME(clone);
+    SET_SYSCALL_NAME(execve);
+    SET_SYSCALL_NAME(mmap);
+    SET_SYSCALL_NAME(fadvise64);
+    SET_SYSCALL_NAME(swapon);
+    SET_SYSCALL_NAME(swapoff);
+    SET_SYSCALL_NAME(mprotect);
+    SET_SYSCALL_NAME(msync);
+    SET_SYSCALL_NAME(mlock);
+    SET_SYSCALL_NAME(munlock);
+    SET_SYSCALL_NAME(mlockall);
+    SET_SYSCALL_NAME(munlockall);
+    SET_SYSCALL_NAME(mincore);
+    SET_SYSCALL_NAME(madvise);
+    SET_SYSCALL_NAME(remap_file_pages);
+    SET_SYSCALL_NAME(mbind);
+    SET_SYSCALL_NAME(get_mempolicy);
+    SET_SYSCALL_NAME(set_mempolicy);
+    SET_SYSCALL_NAME(migrate_pages);
+    SET_SYSCALL_NAME(move_pages);
+    SET_SYSCALL_NAME(rt_tgsigqueueinfo);
+    SET_SYSCALL_NAME(perf_event_open);
+    SET_SYSCALL_NAME(accept4);
+    SET_SYSCALL_NAME(recvmmsg);
+    SET_SYSCALL_NAME(arch_specific_syscall);
+    SET_SYSCALL_NAME(wait4);
+}
+#endif
 
 extern int sys_test(const char *path);
-void do_sys_test(struct trap_context *context)
-{
-    context->a0 = sys_test(context->a0);
-}
 
-int sys_clone(uint flags, void *stack, int ptid, int tls, int ctid)
-{
-    if(flags & SIGCHLD)
-    {
-        struct Process *parent = getcpu()->cur_proc;
-        struct Process *child = new_proc();
-        child->parent = parent;
-        
-        memcpy(&child->tcontext, &parent->tcontext, sizeof(struct trap_context));
-        child->tcontext.k_sp = (uint64)(child->k_stack) + PAGE_SIZE;
-        child->tcontext.sepc += 4; // 子进程pc+4执行ecall下一条指令
-        child->pcontext.ra = (uint64)trap_ret; // 子进程从trap_ret开始执行从内核态转换为用户态
-        if(stack)
-            child->tcontext.sp = stack;
+MAKE_SYSCALL11(test);
+MAKE_SYSCALL31(read);
+MAKE_SYSCALL31(write);
+MAKE_SYSCALL51(clone);
+MAKE_SYSCALL31(wait4);
+MAKE_SYSCALL10(exit);
+MAKE_SYSCALL01(getppid);
+MAKE_SYSCALL01(getpid);
+MAKE_SYSCALL11(times);
+MAKE_SYSCALL11(uname);
+MAKE_SYSCALL00(sched_yield);
+MAKE_SYSCALL21(gettimeofday);
+MAKE_SYSCALL21(nanosleep);
+MAKE_SYSCALL11(brk);
+MAKE_SYSCALL61(mmap);
+MAKE_SYSCALL21(munmap);
+MAKE_SYSCALL21(getcwd);
+MAKE_SYSCALL11(chdir);
+MAKE_SYSCALL41(openat);
+MAKE_SYSCALL11(close);
+MAKE_SYSCALL31(mkdirat);
+MAKE_SYSCALL11(pipe2);
+MAKE_SYSCALL11(dup);
+MAKE_SYSCALL21(dup2);
+MAKE_SYSCALL31(getdents64);
+MAKE_SYSCALL31(execve);
+MAKE_SYSCALL21(fstat);
+MAKE_SYSCALL31(unlinkat);
+MAKE_SYSCALL51(mount);
+MAKE_SYSCALL21(umount2);
 
-        int i, j, k;
-
-        uint64 *p_pg0, *p_pg1, *p_pg2, *p_pg3;
-        uint64 *c_pg0, *c_pg1, *c_pg2, *c_pg3;
-        
-        p_pg0 = parent->pg_t;
-        c_pg0 = kmalloc(PAGE_SIZE);
-        
-        c_pg0[508] = k_pg_t[508];
-        c_pg0[509] = k_pg_t[509];
-        c_pg0[510] = k_pg_t[510];
-
-        for(i = 0; i < 256; i++)
-        {
-            if(p_pg0[i] & PTE_V)
-            {
-                p_pg1 = PTE2PA(p_pg0[i]) + PV_OFFSET;
-                c_pg1 = kmalloc(PAGE_SIZE);
-                if(!(p_pg0[i] & PTE_R) && !(p_pg0[i] & PTE_W) && !(p_pg0[i] & PTE_X)) // 指向下一级
-                {
-                    c_pg0[i] = PA2PTE((uint64)c_pg1 - PV_OFFSET) | PTE_V;
-                    for(j = 0; j < 512; j++)
-                    {
-                        if(p_pg1[j] & PTE_V)
-                        {
-                            p_pg2 = PTE2PA(p_pg1[j]) + PV_OFFSET;
-                            c_pg2 = kmalloc(PAGE_SIZE);
-                            if(!(p_pg1[j] & PTE_R) && !(p_pg1[j] & PTE_W) && !(p_pg1[j] & PTE_X)) // 指向下一级
-                            {
-                                c_pg1[j] = PA2PTE((uint64)c_pg2 - PV_OFFSET) | PTE_V;
-                                for(k = 0; k < 512; k++)
-                                {
-                                    if(p_pg2[k] & PTE_V)
-                                    {
-                                        p_pg3 = PTE2PA(p_pg2[k]) + PV_OFFSET;
-                                        c_pg3 = kmalloc(PAGE_SIZE);
-                                        memcpy(c_pg3, p_pg3, PAGE_SIZE);
-                                        c_pg2[k] = PA2PTE((uint64)c_pg3 - PV_OFFSET) | PTE_V | PTE_R | PTE_W  | PTE_X | PTE_U;
-                                    } else c_pg2[k] = 0;
-                                }
-                            } else c_pg1[i] = PA2PTE((uint64)c_pg2 - PV_OFFSET) | PTE_V | PTE_R | PTE_W  | PTE_X | PTE_U;
-                        } else c_pg1[j] = 0;
-                    }
-                } else c_pg0[i] = PA2PTE((uint64)c_pg1 - PV_OFFSET) | PTE_V | PTE_R | PTE_W  | PTE_X | PTE_U;
-            } else c_pg0[i] = 0;
-        }
-        child->pg_t = c_pg0;
-
-        lock(&parent->lock);
-        add_before(&parent->child_list, &child->child_list_node);
-
-        // TODO ADD UFILE CLONE
-        list *l = parent->ufiles_list.next;
-        while(l != &parent->ufiles_list)
-        {
-            ufile_t *file = list2ufile(l);
-            l = l->next;
-            if(file->type == UTYPE_PIPEIN)
-            {
-                ufile_t *cfile = ufile_alloc_by_fd(file->ufd, child);
-                if(cfile)
-                {
-                    cfile->type = UTYPE_PIPEIN;
-                    cfile->private = file->private;
-                    pipe_t *pipin = cfile->private;
-                    lock(&pipin->mutex);
-                    pipin->r_ref++;
-                    unlock(&pipin->mutex);
-                }
-            } else if(file->type == UTYPE_PIPEOUT)
-            {
-                ufile_t *cfile = ufile_alloc_by_fd(file->ufd, child);
-                if(cfile)
-                {
-                    cfile->type = UTYPE_PIPEOUT;
-                    cfile->private = file->private;
-                    pipe_t *pipin = cfile->private;
-                    lock(&pipin->mutex);
-                    pipin->w_ref++;
-                    unlock(&pipin->mutex);
-                }
-            }
-        }
-
-        unlock(&parent->lock);
-        child->tcontext.a0 = 0; // 子进程返回值为0
-        lock(&list_lock);
-        add_after(&ready_list, &child->status_list_node);
-        unlock(&list_lock);
-        return child->pid;
-    }
-    return -1;
-}
-
-int sys_waitpid(int pid, int *code, int options)
-{
-    struct Process *proc = getcpu()->cur_proc;
-    list *l;
-    struct Process *p;
-    if(is_empty_list(&proc->child_list))
-        return -1;
-    if(options & WNOHANG) // 不阻塞
-    {
-        if(pid == -1) // 任意子进程
-        {
-            lock(&proc->lock);
-            l = proc->child_list.next;
-            while(l != &proc->child_list)
-            {
-                p = child_list_node2proc(l);
-                if(p->status == PROC_DEAD)
-                {
-                    del_list(&p->child_list_node);
-                    del_list(&p->status_list_node); // 摘除
-                    if(code)
-                    {
-                        uint32 ccode = p->code;
-                        ccode = ccode << 8;
-                        *code = ccode;
-                    }
-                    pid = p->pid;
-                    // 释放进程结构体
-                    free_process_struct(p);
-                    unlock(&proc->lock);
-                    return pid;
-                }
-                l = l->next;
-            }
-            unlock(&proc->lock);
-            return 0; // 非阻塞未找到结束的进程直接返回0
-        } else // 指定子进程
-        {
-            lock(&proc->lock);
-            l = proc->child_list.next;
-            while(l != &proc->child_list)
-            {
-                p = child_list_node2proc(l);
-                if(p->pid == pid) // 指定进程存在
-                {
-                    if(p->status == PROC_DEAD)
-                    {
-                        del_list(&p->child_list_node);
-                        del_list(&p->status_list_node); // 摘除
-                        if(code)
-                        {
-                            uint32 ccode = p->code;
-                            ccode = ccode << 8;
-                            *code = ccode;
-                        }
-                        // 释放进程结构体
-                        free_process_struct(p);
-                        unlock(&proc->lock);
-                        return pid;
-                    } else
-                    {
-                        unlock(&proc->lock);
-                        return 0;
-                    }
-                }
-                l = l->next;
-            }
-            unlock(&proc->lock);
-            return -1; // 指定进程不存在
-        }
-    } else { // 阻塞
-        if(pid == -1) // 任意子进程
-        {
-            while(1)
-            {
-                P(&proc->signal); // 阻塞
-                lock(&proc->lock);
-                l = proc->child_list.next;
-                while(l != &proc->child_list)
-                {
-                    p = child_list_node2proc(l);
-                    if(p->status == PROC_DEAD)
-                    {
-                        del_list(&p->child_list_node);
-                        del_list(&p->status_list_node); // 摘除
-                        if(code)
-                        {
-                            uint32 ccode = p->code;
-                            ccode = ccode << 8;
-                            *code = ccode;
-                        }
-                        pid = p->pid;
-                        // 释放进程结构体
-                        free_process_struct(p);
-                        unlock(&proc->lock);
-                        return pid;
-                    }
-                    l = l->next;
-                }
-                unlock(&proc->lock);
-            }
-        } else // 指定子进程
-        {
-            lock(&proc->lock);
-            l = proc->child_list.next;
-            while(l != &proc->child_list)
-            {
-                p = child_list_node2proc(l);
-                if(p->pid == pid) // 指定进程存在
-                {
-                    while(1)
-                    {
-                        unlock(&proc->lock);
-                        P(&proc->signal);
-                        lock(&proc->lock);
-                        if(p->status == PROC_DEAD)
-                        {
-                            del_list(&p->child_list_node);
-                            del_list(&p->status_list_node); // 摘除
-                            if(code)
-                            {
-                                uint32 ccode = p->code;
-                                ccode = ccode << 8;
-                                *code = ccode;
-                            }
-                            // 释放进程结构体
-                            free_process_struct(p);
-                            unlock(&proc->lock);
-                            return pid;
-                        } else V(&proc->signal); // 说明此信号是其他子进程发出的，因此需要V还原信号继续等待
-                    }
-                }
-                l = l->next;
-            }
-            unlock(&proc->lock);
-            return -1; // 指定进程不存在
-        }
-    }
-    return -1;
-}
-
-void sys_exit(int code)
-{
-    struct Process *proc = getcpu()->cur_proc;
-    lock(&proc->lock);
-    proc->status = PROC_DEAD; // 置状态位为DEAD
-    proc->end_time = get_time();
-    proc->code = code;
-    struct Process *parent = proc->parent;
-    lock(&parent->lock);
-    list *l = proc->child_list.next;
-    while(l!=&proc->child_list) // 将子进程加入到父进程的子进程队列中
-    {
-        struct Process *child = child_list_node2proc(l);
-        l = l->next;
-        if(child->status == PROC_DEAD) // 有未释放的子进程pcb则释放，否则将子进程加入其父进程
-        {
-            kfree(child->k_stack);
-            free_process_struct(child);
-        } else add_before(&parent->child_list, &child->child_list_node);
-    }
-    unlock(&parent->lock);
-    free_process_mem(proc);
-    free_ufile_list(proc);
-    V(&parent->signal);
-    move_switch2sched(proc, &dead_list);
-}
-
-int sys_getppid(void)
-{
-    struct Process *proc = getcpu()->cur_proc;
-    if(proc->parent)
-        return proc->parent->pid;
-    else return 0;
-}
-
-int sys_getpid(void)
-{
-    return getcpu()->cur_proc->pid;
-}
-
-int sys_times(struct tms *tms)
-{
-    if(!tms) return -1;
-    struct Process *proc = getcpu()->cur_proc;
-    tms->tms_utime = proc->utime;
-    tms->tms_stime = (proc->stime + get_time() - proc->stime_start);
-    tms->tms_cstime = 0;
-    tms->tms_cutime = 0;
-    lock(&proc->lock);
-    list *l = proc->child_list.next;
-    while(l != &proc->child_list)
-    {
-        struct Process *child = child_list_node2proc(l);
-        if(child->status == PROC_DEAD)
-        {
-            tms->tms_cutime += child->utime;
-            tms->tms_cstime += child->stime;
-        }
-    }
-    unlock(&proc->lock);
-    return 0;
-}
-
-int sys_uname(struct utsname *uts)
-{
-    if(!uts) return -1;
-    strcpy(uts->sysname, "LinanOS");
-    strcpy(uts->nodename, "Calvin");
-    strcpy(uts->release, "1.0");
-    strcpy(uts->version, "1.0");
-    strcpy(uts->machine, "risc-v");
-    strcpy(uts->domainname, "gitlab.com");
-    return 0;
-}
-
-void sys_sched_yield(void)
-{
-    struct Process *proc = getcpu()->cur_proc;
-    lock(&proc->lock);
-    proc->status = PROC_READY;
-    move_switch2sched(proc, &ready_list);
-}
-
-int sys_gettimeofday(struct TimeVal *time, int tz)
-{
-    if(!time) return -1;
-    uint64 t = get_time();
-    time->sec = t / TIMER_FRQ;
-    time->usec = (t % TIMER_FRQ) * 1000000 / TIMER_FRQ;
-    return 0;
-}
-
-int sys_sleep(struct TimeVal *timein, struct TimeVal *timeout)
-{
-    if(!timein || !timeout) return -1;
-    struct Process *proc = getcpu()->cur_proc;
-    lock(&proc->lock);
-    proc->t_wait = get_time() + timein->sec * TIMER_FRQ + timein->usec * TIMER_FRQ / 1000000;
-    proc->status = PROC_WAIT;
-    move_switch2sched(proc, &wait_list);
-    return 0;
-}
-
-uint64 sys_brk(void* addr)
-{
-    struct Process *proc = getcpu()->cur_proc;
-    if(!addr)
-    {
-        return proc->brk;
-    }
-    if((uint64)addr < (uint64)proc->minbrk) return -1;
-    if((uint64)addr == (uint64)proc->brk) return 0;
-    else if((uint64)addr > (uint64)proc->brk) // 扩展堆
-    {
-        uint64 pageaddrend = (uint64)addr;
-        if(pageaddrend & 0xfff)
-        {
-            pageaddrend = ((pageaddrend >> 12) + 1) << 12;
-        } else pageaddrend = (pageaddrend >> 12) << 12;
-
-        int pagen = (pageaddrend >> 12) - ((uint64)proc->brk >> 12) - 1;
-        if(!pagen)
-        {
-            proc->brk = addr;
-            return 0;
-        }
-        if(pagen > free_page_pool.page_num) return -1;
-        if(!build_pgt(proc->pg_t, (((uint64)proc->brk >> 12) + 1) << 12, pagen)) return -1;
-        proc->brk = addr;
-        return 0;
-    } else { // 减小堆
-        uint64 pageaddrstart = (uint64)addr;
-        if(pageaddrstart & 0xfff)
-        {
-            pageaddrstart = ((pageaddrstart >> 12) + 1) << 12;
-        } else pageaddrstart = (pageaddrstart >> 12) << 12;
-
-        int pagen = ((uint64)proc->brk >> 12) + 1 - (pageaddrstart >> 12);
-        if(!pagen)
-        {
-            proc->brk = addr;
-            return 0;
-        }
-        
-        // 开始释放
-        uint64 *pg0, *pg1, *pg2, *pg3;
-        uint64 pg0_index = (pageaddrstart >> 30) & 0x1FF;
-        uint64 pg1_index = (pageaddrstart >> 21) & 0x1FF;
-        uint64 pg2_index = (pageaddrstart >> 12) & 0x1FF;
-        int i, j, k;
-        int cnt = 0;
-        pg0 = proc->pg_t;
-        for(i = pg0_index; i < 256; i++)
-        {
-            if(pg0[i] & PTE_V)
-            {
-                pg1 = PTE2PA(pg0[i]) + PV_OFFSET;
-                if(!(pg0[i] & PTE_R) && !(pg0[i] & PTE_W) && !(pg0[i] & PTE_X)) // 指向下一级
-                {
-                    for(j = pg1_index; j < 256; j++)
-                    {
-                        if(pg1[j] & PTE_V)
-                        {
-                            pg2 = PTE2PA(pg1[j]) + PV_OFFSET;
-                            if(!(pg1[j] & PTE_R) && !(pg1[j] & PTE_W) && !(pg1[j] & PTE_X)) // 指向下一级
-                            {
-                                for(k = pg2_index; k < 256; k++)
-                                {
-                                    if(pg2[k] & PTE_V)
-                                    {
-                                        pg3 = PTE2PA(pg2[k]) + PV_OFFSET;
-                                        kfree(pg3);
-                                        pg2[k] = 0;
-                                        cnt++;
-                                        if(cnt == pagen)
-                                        {
-                                            proc->brk = addr;
-                                            return 0;
-                                        }
-                                    }
-                                }
-                            }
-                            kfree(pg2);
-                            pg1[j] = 0;
-                        }
-                    }
-                }
-                kfree(pg1);
-                pg0[i] = 0;
-            }
-        }
-    }
-    return -1;
-}
-
-uint64 sys_mmap(uint64 start, uint64 len, uint64 prot, uint64 flags, uint64 ufd, uint64 off)
-{
-    struct Process *proc = getcpu()->cur_proc;
-    
-    ufile_t *file = ufd2ufile(ufd, proc);
-    if(!file) return -1;
-    if(file->type != UTYPE_FILE) return -1;
-
-    int fd = (int)file->private;
-
-    if(!start)
-    {
-        vfs_lseek(fd, off, VFS_SEEK_SET);
-        void *brk = proc->brk;
-        if(sys_brk((uint64)brk + len) == -1) return -1;
-        vfs_read(fd, brk, len);
-        return brk;
-    } else
-    {
-
-    }
-    return -1;
-}
-
-int sys_munmap(void *start, int len)
-{
-    uchar *p = start;
-    while(p < (uint64)start+len)
-    {
-        *p = 0;
-        p++;
-    }
-    return 0;
-}
-/******************************************************************/
-
-void do_sys_read(struct trap_context *context)
-{
-    context->a0 = sys_read(context->a0, context->a1, context->a2);
-}
-
-void do_sys_write(struct trap_context *context)
-{
-    context->a0 = sys_write(context->a0, context->a1, context->a2);
-}
-
-void do_sys_clone(struct trap_context *context)
-{
-    context->a0 = sys_clone(context->a0, context->a1, context->a2, context->a3, context->a4);
-}
-
-void do_sys_waitpid(struct trap_context *context)
-{
-    context->a0 = sys_waitpid(context->a0, context->a1, context->a2);
-}
-
-void do_sys_exit(struct trap_context *context)
-{
-    sys_exit(context->a0);
-}
-
-void do_sys_getppid(struct trap_context *context)
-{
-    context->a0 = sys_getppid();
-}
-
-void do_sys_getpid(struct trap_context *context)
-{
-    context->a0 = sys_getpid();
-}
-
-void do_sys_times(struct trap_context *context)
-{
-    context->a0 = sys_times(context->a0);
-}
-
-void do_sys_uname(struct trap_context *context)
-{
-    context->a0 = sys_uname(context->a0);
-}
-
-void do_sys_sched_yield(struct trap_context *context)
-{
-    sys_sched_yield();
-}
-
-void do_sys_gettimeofday(struct trap_context *context)
-{
-    context->a0 = sys_gettimeofday(context->a0, context->a1);
-}
-
-void do_sys_sleep(struct trap_context *context)
-{
-    context->a0 = sys_sleep(context->a0, context->a1);
-}
-
-void do_sys_brk(struct trap_context *context)
-{
-    context->a0 = sys_brk(context->a0);
-}
-
-void do_sys_mmap(struct trap_context *context)
-{
-    context->a0 = sys_mmap(context->a0, context->a1, context->a2, context->a3, context->a4, context->a5);
-}
-
-void do_sys_munmap(struct trap_context *context)
-{
-    context->a0 = sys_munmap(context->a0, context->a1);
-}
-
-void do_sys_getcwd(struct trap_context *context)
-{
-    context->a0 = sys_getcwd(context->a0, context->a1);
-}
-
-void do_sys_chdir(struct trap_context *context)
-{
-    context->a0 = sys_chdir(context->a0);
-}
-
-void do_sys_openat(struct trap_context *context)
-{
-    context->a0 = sys_openat(context->a0, context->a1, context->a2, context->a3);
-}
-
-void do_sys_close(struct trap_context *context)
-{
-    context->a0 = sys_close(context->a0);
-}
-
-void do_sys_mkdirat(struct trap_context *context)
-{
-    context->a0 = sys_mkdirat(context->a0, context->a1, context->a2);
-}
-
-void do_sys_pipe2(struct trap_context *context)
-{
-    context->a0 = sys_pipe2(context->a0);
-}
-
-void do_sys_dup(struct trap_context *context)
-{
-    context->a0 = sys_dup(context->a0);
-}
-
-void do_sys_dup2(struct trap_context *context)
-{
-    context->a0 = sys_dup2(context->a0, context->a1);
-}
-
-void do_sys_getdents64(struct trap_context *context)
-{
-    context->a0 = sys_getdents64(context->a0, context->a1, context->a2);
-}
-
-void do_sys_execve(struct trap_context *context)
-{
-    context->a0 = sys_execve(context->a0, context->a1, context->a2);
-}
-
-void do_sys_fstat(struct trap_context *context)
-{
-    context->a0 = sys_fstat(context->a0, context->a1);
-}
-
-void do_sys_unlinkat(struct trap_context *context)
-{
-    context->a0 = sys_unlinkat(context->a0, context->a1, context->a2);
-}
-
-void do_sys_mount(struct trap_context *context)
-{
-    context->a0 = sys_mount(context->a0, context->a1, context->a2, context->a3, context->a4);
-}
-
-void do_sys_umount2(struct trap_context *context)
-{
-    context->a0 = sys_umount2(context->a0, context->a1);
-}
-
+MAKE_SYSCALL31(mprotect);
+MAKE_SYSCALL11(set_tid_address);
+MAKE_SYSCALL01(getuid);
+MAKE_SYSCALL01(geteuid);
+MAKE_SYSCALL01(getgid);
+MAKE_SYSCALL01(getegid);
+MAKE_SYSCALL31(readv);
+MAKE_SYSCALL31(writev);
+MAKE_SYSCALL21(clock_gettime);
+MAKE_SYSCALL41(readlinkat);
+MAKE_SYSCALL11(fcntl);
+MAKE_SYSCALL01(rt_sigaction);
+MAKE_SYSCALL01(exit_group);
+MAKE_SYSCALL41(fstatat);
+MAKE_SYSCALL31(ppoll);
+MAKE_SYSCALL41(clock_nanosleep);
+MAKE_SYSCALL21(statfs);
+MAKE_SYSCALL31(syslog);
+MAKE_SYSCALL41(faccessat);
+MAKE_SYSCALL21(ioctl);
 
 void syscall_init(void)
 {
@@ -667,11 +360,16 @@ void syscall_init(void)
     {
         syscall_table[i] = unknown_syscall;
     }
+
+    #ifdef _STRACE
+    set_syscall_name();
+    #endif
+
     syscall_table[SYS_test] = do_sys_test;
     syscall_table[SYS_read] = do_sys_read;
     syscall_table[SYS_write] = do_sys_write;
     syscall_table[SYS_clone] = do_sys_clone;
-    syscall_table[SYS_wait4] = do_sys_waitpid;
+    syscall_table[SYS_wait4] = do_sys_wait4;
     syscall_table[SYS_exit] = do_sys_exit;
     syscall_table[SYS_getppid] = do_sys_getppid;
     syscall_table[SYS_getpid] = do_sys_getpid;
@@ -679,7 +377,7 @@ void syscall_init(void)
     syscall_table[SYS_uname] = do_sys_uname;
     syscall_table[SYS_sched_yield] = do_sys_sched_yield;
     syscall_table[SYS_gettimeofday] = do_sys_gettimeofday;
-    syscall_table[SYS_nanosleep] = do_sys_sleep;
+    syscall_table[SYS_nanosleep] = do_sys_nanosleep;
     syscall_table[SYS_brk] = do_sys_brk;
     syscall_table[SYS_mmap] = do_sys_mmap;
     syscall_table[SYS_munmap] = do_sys_munmap;
@@ -698,4 +396,27 @@ void syscall_init(void)
     syscall_table[SYS_unlinkat] = do_sys_unlinkat;
     syscall_table[SYS_mount] = do_sys_mount;
     syscall_table[SYS_umount2] = do_sys_umount2;
+
+
+    syscall_table[SYS_mprotect] = do_sys_mprotect;
+    syscall_table[SYS_set_tid_address] = do_sys_set_tid_address;
+    syscall_table[SYS_getuid] = do_sys_getuid;
+    syscall_table[SYS_geteuid] = do_sys_geteuid;
+    syscall_table[SYS_getgid] = do_sys_getgid;
+    syscall_table[SYS_getegid] = do_sys_getegid;
+    syscall_table[SYS_readv] = do_sys_readv;
+    syscall_table[SYS_writev] = do_sys_writev;
+    syscall_table[SYS_clock_gettime] = do_sys_clock_gettime;
+    syscall_table[SYS_readlinkat] = do_sys_readlinkat;
+    syscall_table[SYS_fcntl] = do_sys_fcntl;
+    syscall_table[SYS_fstatat] = do_sys_fstatat;
+    syscall_table[SYS_ppoll] = do_sys_ppoll;
+
+    syscall_table[SYS_rt_sigaction] = do_sys_rt_sigaction;
+    syscall_table[SYS_exit_group] = do_sys_exit_group;
+    syscall_table[SYS_clock_nanosleep] = do_sys_clock_nanosleep;
+    syscall_table[SYS_statfs] = do_sys_statfs;
+    syscall_table[SYS_syslog] = do_sys_syslog;
+    syscall_table[SYS_faccessat] = do_sys_faccessat;
+    syscall_table[SYS_ioctl] = do_sys_ioctl;
 }

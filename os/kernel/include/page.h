@@ -37,8 +37,8 @@ Page* alloc_pages(uint64 n);
 void free_pages(Page *page, uint64 n);
 static inline Page* get_page_by_pm_addr(uint64 addr) __attribute__((always_inline));
 static inline uint64 get_pm_addr_by_page(Page *page) __attribute__((always_inline));
-static inline Page* get_page_by_vm_addr(uint64 addr) __attribute__((always_inline));
-static inline uint64 get_vm_addr_by_page(Page *page) __attribute__((always_inline));
+static inline Page* get_page_by_kvm_addr(uint64 addr) __attribute__((always_inline));
+static inline uint64 get_kvm_addr_by_page(Page *page) __attribute__((always_inline));
 
 // 根据物理地址获取Page
 static inline Page* get_page_by_pm_addr(uint64 addr)
@@ -54,14 +54,14 @@ static inline uint64 get_pm_addr_by_page(Page *page)
     return addr;
 }
 
-// 根据虚拟地址获取Page
-static inline Page* get_page_by_vm_addr(uint64 addr)
+// 根据内核虚拟地址获取Page
+static inline Page* get_page_by_kvm_addr(uint64 addr)
 {
     return &pages_map[(addr >> 12)-((VM_START)>>12)];
 }
 
 // 根据Page获取内核虚拟地址
-static inline uint64 get_vm_addr_by_page(Page *page)
+static inline uint64 get_kvm_addr_by_page(Page *page)
 {
     uint64 offset = page - pages_map;
     return VM_START + 0x1000 * offset;
