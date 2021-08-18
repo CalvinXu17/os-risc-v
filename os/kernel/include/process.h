@@ -7,6 +7,7 @@
 #include "sem.h"
 #include "intr.h"
 #include "vfs.h"
+#include "signal.h"
 
 #define PROC_N  100
 
@@ -16,7 +17,7 @@
 #define PROC_WAIT   3
 #define PROC_SLEEP  4
 
-#define T_SLICE     50 // 默认时间片大小
+#define T_SLICE     100 // 默认时间片大小
 
 #define PROC_FILE_MAX 10
 
@@ -53,7 +54,7 @@ struct Process
     int64 t_slice;
 
     char code;
-    struct semephore signal;
+    struct semephore sleep_lock;
 
     struct Process *parent;
     list status_list_node;
@@ -79,6 +80,13 @@ struct Process
     
     void *minbrk;
     void *brk;
+
+    struct sigaction sigactions[SIGRTMIN];
+    uint do_signal;
+    uint sigmask;
+    list signal_list_head;
+
+    uint receive_kill;
 };
 
 #define status_list_node2proc(l)    GET_STRUCT_ENTRY(l, struct Process, status_list_node)
@@ -124,7 +132,7 @@ struct Process
 void proc_init(void);
 int32 get_pid(void);
 void free_pid(int32 pid);
-void user_init(int hartid);
+struct Process* get_proc_by_pid(int pid);
 
 struct Process* new_proc(void);
 void free_process_mem(struct Process *proc);
@@ -132,7 +140,10 @@ void free_process_struct(struct Process *proc);
 void* build_pgt(uint64 *pg0_t, uint64 page_begin_va, uint64 page_cnt);
 void free_ufile_list(struct Process *p);
 
+void kill_current(void);
+
 void print_user_stack(struct Process *proc);
 struct Process* create_proc_by_elf(char *absolute_path, char *const argv[], char *const envp[]);
 
+void user_init(int hartid);
 #endif

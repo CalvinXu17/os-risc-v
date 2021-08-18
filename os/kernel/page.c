@@ -1,9 +1,11 @@
 #include "page.h"
 #include "printk.h"
 #include "panic.h"
+#include "spinlock.h"
 
 Page pages_map[PAGE_NUM];
 Page_Pool free_page_pool;
+spinlock page_lock;
 
 uint64 align4k(uint64 s)
 {
@@ -14,6 +16,7 @@ uint64 align4k(uint64 s)
 
 void page_init(void)
 {
+    init_spinlock(&page_lock, "page_lock");
     #ifdef _DEBUG
     printk("page init...\n");
     #endif
@@ -65,6 +68,8 @@ Page* alloc_pages(uint64 n) // 首次适应法
     if(n>free_page_pool.page_num) // 空闲页面不足
         return 0;
     
+    lock(&page_lock);
+
     list *l=free_page_pool.pages_list.next;
     Page *page = 0;
     while(l != &(free_page_pool.pages_list))
@@ -97,6 +102,7 @@ Page* alloc_pages(uint64 n) // 首次适应法
         // page->free_page_num = n;
         free_page_pool.page_num -= n;
     }
+    unlock(&page_lock);
     return page;
 }
 
@@ -113,6 +119,8 @@ void free_pages(Page *page, uint64 n)
             p->ref_cnt--;
         }
     
+    lock(&page_lock);
+
     page->free_page_num = n;
     free_page_pool.page_num += n;
     
@@ -163,4 +171,5 @@ void free_pages(Page *page, uint64 n)
             del_list(&(p->page_list));
         }
     }
+    unlock(&page_lock);
 }

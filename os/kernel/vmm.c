@@ -4,6 +4,7 @@
 #include "string.h"
 #include "kmalloc.h"
 #include "process.h"
+#include "signal.h"
 
 struct vma* new_vma(void)
 {
@@ -21,21 +22,16 @@ struct vma* new_vma(void)
 void free_vma_mem(uint64 *pgt, struct vma *vma)
 {
     uint64 pa = va2pa(pgt, vma->va);
-    if(vma->file) // TODO
+    if(vma->file)
     {
-        int fd = vfs_file2fd(vma->file);
         if(pa)
         {
-            vfs_fstat_t st;
-            if(vfs_stat(vma->file->relative_path, &st) == 0)
-            {
-                vfs_lseek(fd, vma->foff, VFS_SEEK_SET);
-                vfs_write(fd, pa + PV_OFFSET, st.size - vma->foff);
-            }
+            vm_free_pages(pa + PV_OFFSET, 1);
+            unmappages(pgt, vma->va, 1);
         }
-        vfs_close(fd);
+        
+        return;
     }
-    
     uint64 vai;
     for(vai = vma->va; vai < vma->va + vma->size; vai += PAGE_SIZE)
     {
@@ -43,14 +39,34 @@ void free_vma_mem(uint64 *pgt, struct vma *vma)
         
         if(pa)
         {
+            if(vma->file)
+            {
+                // uint64 file_begin_va = vma->va + vma->vmoff;
+                // int fd = vfs_file2fd(vma->file);
+                // if(vai <= file_begin_va)
+                // {
+                //     vfs_lseek(fd, vma->foff, VFS_SEEK_SET);
+                //     uint64 page_remain = PAGE_SIZE - (file_begin_va - vai);
+                //     vfs_write(fd, (uint64)pa + PV_OFFSET + (file_begin_va - vai), page_remain);
+                // } else
+                // {
+                //     uint64 file_begin = vma->foff + vai - file_begin_va;
+                //     vfs_lseek(fd, file_begin, VFS_SEEK_SET);
+                //     vfs_write(fd, (uint64)pa + PV_OFFSET, PAGE_SIZE);
+                // }
+                
+            }
+
             if(!isforkmem(pgt, vai))
             {
                 vm_free_pages(pa + PV_OFFSET, 1);
             }
+
             unmappages(pgt, vai, 1);
         }
         
     }
+    vma->file = NULL;
 }
 
 struct vma* find_vma(struct Process *proc, uint64 va)
@@ -119,9 +135,12 @@ void copy_kpgt(uint64 *pg_t)
     pg_t[510] = k_pg_t[510];
 }
 
+uint64 mcnt = 0;
 void *vm_alloc_pages(uint64 pagecnt)
 {
-    void *mem = get_kvm_addr_by_page(alloc_pages(pagecnt));
+    Page *page = alloc_pages(pagecnt);
+    if(!page) return NULL;
+    void *mem = get_kvm_addr_by_page(page);
     memset(mem, 0, pagecnt * PAGE_SIZE);
     return mem;
 }
@@ -421,62 +440,36 @@ void do_page_fault(struct Process *proc, uint64 badaddr)
     uint64 badpage = PAGEDOWN(badaddr);
     uint64 pa = va2pa(proc->pg_t, badpage);
     struct vma *vma = find_vma(proc, badaddr);
-    void *mem = vm_alloc_pages(1);
+    void *mem = NULL;
+
+    if(pa == 0) // 未分配内存的情况
+        mem = vm_alloc_pages(1);
+    else mem = pa + PV_OFFSET; // 已分配，但触发了缺页异常则一定是读写属性的问题
+    
+    if(pa)
+        send_signal(proc, SIGBUS);
+    else
+        send_signal(proc, SIGSEGV);
+
     if(vma)
     {
         // 先映射内存
         if((vma->type & VMA_CLONE) && isforkmem(proc->pg_t, badpage)) // 写时复制
         {
-            // printk("copy on write\n");
-            if(pa)
-            {
-                memcpy(mem, pa + PV_OFFSET, PAGE_SIZE);
-                vma->prot |= PROT_WRITE;
-            }
+            memcpy(mem, pa + PV_OFFSET, PAGE_SIZE);
+            vma->prot |= PROT_READ | PROT_WRITE;
         } else
         {
             if(vma->type & VMA_PROG) // 位于可执行文件中需要拷贝至指定内存
             {
                 int fd = proc->kfd;
                 uint64 file_begin_va = vma->va + vma->vmoff; // 该段的起始va
-                // printk("file_begin_va %lx\n", file_begin_va);
                 if(badpage <= file_begin_va) // 此页为该段的首页且起始地址不是按页对齐
                 {
                     vfs_lseek(fd, vma->foff, VFS_SEEK_SET);
                     uint64 page_remain = PAGE_SIZE - (file_begin_va - badpage);
                     uint64 read_size = vma->fsize < page_remain ? vma->fsize : page_remain;
-                    int size = vfs_read(fd, (uint64)mem + (file_begin_va - badpage), read_size);
-                    // printk("first seek %lx pageoff %lx readsize %lx:%lx\n", vma->foff, (file_begin_va - badpage), read_size, size);
-                } else
-                {
-                    uint64 file_begin = vma->foff + badpage - file_begin_va;
-                    if(vma->fsize > (file_begin - vma->foff))
-                    {
-                        uint64 file_remain = vma->fsize - (file_begin - vma->foff);
-                        vfs_lseek(fd, file_begin, VFS_SEEK_SET);
-                        uint64 read_size = file_remain < PAGE_SIZE ? file_remain : PAGE_SIZE;
-                        int size = vfs_read(fd, mem, read_size);
-                        // printk("seek %lx pageoff %lx readsize %lx:%lx\n", file_begin, badpage - file_begin_va, read_size, size);
-                    }
-                    
-                }
-            } else if(vma->file) // 此为map映射的文件
-            {
-                vfs_fstat_t st;
-                if(vfs_stat(vma->file->relative_path, &st) < 0)
-                {
-                    // kill
-                    printk("do page fault fail stat\n");
-                    return;
-                }
-                int fd = vfs_file2fd(vma->file);
-                uint64 file_begin_va = vma->va + vma->vmoff;
-                if(badpage <= file_begin_va)
-                {
-                    vfs_lseek(fd, vma->foff, VFS_SEEK_SET);
-                    uint64 page_remain = PAGE_SIZE - (badaddr - badpage);
-                    uint64 read_size = vma->fsize < page_remain ? vma->fsize : page_remain;
-                    vfs_read(fd, (uint64)mem + (badaddr - badpage), read_size);
+                    vfs_read(fd, (uint64)mem + (file_begin_va - badpage), read_size);
                 } else
                 {
                     uint64 file_begin = vma->foff + badpage - file_begin_va;
@@ -488,14 +481,54 @@ void do_page_fault(struct Process *proc, uint64 badaddr)
                         vfs_read(fd, mem, read_size);
                     }
                 }
+                if(pa) vma->prot |= PROT_READ | PROT_WRITE;
+            } else if(vma->file) // 此为map映射的文件
+            {
+                // printk("mmap\n");
+                uint64 first_pa = va2pa(proc->pg_t, vma->va);
+                if(first_pa)
+                {
+                    if(mem)
+                        vm_free_pages(mem, 1);
+                    mem = first_pa + PV_OFFSET;
+                } else
+                {
+                    mappages(proc->pg_t, vma->va, (uint64)mem-PV_OFFSET, 1, prot2pte(vma->prot));
+                }
+                // vfs_fstat_t st;
+                // if(vfs_stat(vma->file->relative_path, &st) < 0)
+                // {
+                //     // kill
+                //     send_signal(proc, SIGTERM);
+                //     printk("do page fault fail stat\n");
+                //     return;
+                // }
+                // int fd = vfs_file2fd(vma->file);
+                // uint64 file_begin_va = vma->va + vma->vmoff;
+                // if(badpage <= file_begin_va)
+                // {
+                //     vfs_lseek(fd, vma->foff, VFS_SEEK_SET);
+                //     uint64 page_remain = PAGE_SIZE - (badaddr - badpage);
+                //     uint64 read_size = vma->fsize < page_remain ? vma->fsize : page_remain;
+                //     vfs_read(fd, (uint64)mem + (badaddr - badpage), read_size);
+                // } else
+                // {
+                //     uint64 file_begin = vma->foff + badpage - file_begin_va;
+                //     if(vma->fsize > (file_begin - vma->foff))
+                //     {
+                //         uint64 file_remain = vma->fsize - (file_begin - vma->foff);
+                //         vfs_lseek(fd, file_begin, VFS_SEEK_SET);
+                //         uint64 read_size = file_remain < PAGE_SIZE ? file_remain : PAGE_SIZE;
+                //         vfs_read(fd, mem, read_size);
+                //     }
+                // }
             } else // else 则为mmap或brk开辟但未映射的空间
             {
-                // printk("map pages\n");
+
             }
         }
     } else // 此处为用户栈因为vma不存在则为栈，或者也可能是程序读写了非法地址，直接分配一页内存即可
     {
-        // printk("map stack\n");
         vma = new_vma();
         vma->va = badpage;
         vma->size = PAGE_SIZE;

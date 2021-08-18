@@ -6,7 +6,7 @@
 typedef struct vfs_inode_st vfs_inode_t;
 
 // why do you open so many files in a IOT system?
-#define VFS_FILE_OPEN_MAX               64
+#define VFS_FILE_OPEN_MAX               128
 
 // why your file path so deep?
 #define VFS_PATH_MAX                    32

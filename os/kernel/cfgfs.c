@@ -501,3 +501,70 @@ vfs_fs_ops_t proc_fs = {
     .closedir = proc_closedir,
     .readdir = proc_readdir
 };
+
+
+static int vfs_zero_open(vfs_file_t *file)
+{
+    return 0;
+}
+
+static int vfs_zero_close(vfs_file_t *file)
+{
+    return 0;
+}
+
+static uint64 vfs_zero_read(vfs_file_t *file, void *buf, uint64 count)
+{
+    char *p = buf;
+    while(p < buf+count)
+    {
+        *p = 0;
+        p++;
+    }
+    return count;
+}
+
+static uint64 vfs_zero_write(vfs_file_t *file, const void *buf, uint64 count)
+{
+    return count;
+}
+
+vfs_chrdev_ops_t zero = {
+    .open = vfs_zero_open,
+    .close = vfs_zero_close,
+    .read = vfs_zero_read,
+    .write = vfs_zero_write,
+};
+
+static int vfs_null_open(vfs_file_t *file)
+{
+    return 0;
+}
+
+static int vfs_null_close(vfs_file_t *file)
+{
+    return 0;
+}
+
+static uint64 vfs_null_read(vfs_file_t *file, void *buf, uint64 count)
+{
+    char *p = buf;
+    while(p < buf+count)
+    {
+        *p = 0;
+        p++;
+    }
+    return count;
+}
+
+static uint64 vfs_null_write(vfs_file_t *file, const void *buf, uint64 count)
+{
+    return count;
+}
+
+vfs_chrdev_ops_t null = {
+    .open = vfs_null_open,
+    .close = vfs_null_close,
+    .read = vfs_null_read,
+    .write = vfs_null_write,
+};

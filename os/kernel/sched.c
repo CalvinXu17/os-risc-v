@@ -1,6 +1,7 @@
 #include "sched.h"
 #include "mm.h"
 #include "printk.h"
+#include "timer.h"
 
 struct proc_context sched_context[CPU_N]; // 保存scheduler调度器执行的上下文环境，切换到这里即切换到调度器运行
 spinlock list_lock;
@@ -30,13 +31,20 @@ void scheduler(void)
     {
         lock(&list_lock);
         l = ready_list.next;
-        if(!is_empty_list(l))
+        if(l != &ready_list)
         {
             p = status_list_node2proc(l);
+
+            if(p->pid == 0 && l->next != &ready_list) // 除了0进程还有其他进程则调度其他进程
+            {
+                l = l->next;
+                p = status_list_node2proc(l);
+                p->t_slice = get_time() + T_SLICE * TIMER_FRQ / 1000;
+            } else p->t_slice = get_time();
+
             del_list(l);
             lock(&p->lock);
             p->status = PROC_RUN;
-            p->t_slice = T_SLICE;
             p->tcontext.hartid = hartid; // 更新被调度进程的hartid为当前cpu的id
             if(p->start_time == 0) // 该程序第一次运行，则更新utime
             {

@@ -22,4 +22,7 @@ extern vfs_fs_ops_t etc_fs;
 
 extern vfs_chrdev_ops_t proc_dev;
 extern vfs_fs_ops_t proc_fs;
+
+extern vfs_chrdev_ops_t zero;
+extern vfs_chrdev_ops_t null;
 #endif

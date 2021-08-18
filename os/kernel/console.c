@@ -52,9 +52,12 @@ void console_intr(void)
 int console_read(char *s, int len)
 {
     int cnt = len;
+    struct Process *proc = getcpu()->cur_proc;
     while(len > 0)
     {
         P(&consbuf.sem);
+        if(proc->receive_kill > 0)
+            break;
         lock(&consbuf.mutex);
         *s = consbuf.buf[consbuf.r_pos++];
         consbuf.r_pos %= CONSOLE_BSIZE;

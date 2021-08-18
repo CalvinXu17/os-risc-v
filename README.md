@@ -8,6 +8,133 @@ gitlab仓库地址：[消失的发际线 / OSKernel2021-LinanOS · GitLab (eduxi
 
 github仓库地址：[CalvinXu17/os-risc-v: os on risc-v (github.com)](https://github.com/CalvinXu17/os-risc-v)
 
+## 决赛第二阶段
+
+决赛第二阶段任务为调用lmbench执行系统性能测试，虽然在第一阶段完成了busybox和lua的运行，但对于lmbench的启动在初期仍然存在很多bug需要修复，第二阶段主要完成了以下几点任务：
+
+- 修复文件系统bug
+- pselect系统调用bug
+- 添加必要的新系统调用
+- signal信号机制的实现
+- 系统性能调优
+
+### BUG修复
+
+#### 1. 文件系统
+
+##### 1.1 bug描述
+
+在lmbench测试执行到100个文件句柄select，不断fork子进程进程测试时文件系统会出现异常崩溃的现象，经反复debug发现问题出在文件句柄close时发生了泄露的情况，在重复测试时导致大量**文件句柄无法被释放**从而使文件系统崩溃。
+
+##### 1.2 问题解决
+
+文件句柄泄露出现在stdin和stdout上，文件close逻辑上出现了错误，一开始默认认为不会close std文件，实际上std文件是可被close的，例如close复制后的std文件。添加close std文件后该问题即解决。
+
+#### 2. pselect系统调用
+
+##### 2.1 bug描述
+
+该bug卡了很长一段时间没有解决，主要表现为在本地的k210板子上lmbench父子进程可正常通讯来实现系统性能测试，然而到了评测机上运行则会卡住无法继续。起初认为是pselect系统调用实现逻辑有问题，然而无论怎么改也没有解决，后只得在评测机上逐行打印系统调用顺序进行调试，因为本地开发板始终无法复现该bug。
+
+##### 2.2 问题解决
+
+通过观察评测机stdout以及lmbench源代码，最终定位到了出问题所在代码：
+
+![pselct](./doc/11.jpg)
+
+该select查询管道文件start_signal是否有数据可读，若可读则读取并开始测试，否则该函数内会重读执行这里来轮询start_signal管道文件。经过艰辛的调试发现，这里的select始终判定管道文件可读，即下面`FD_ISSET`始终返回1，然后读取该管道文件，实际上该管道文件还未被写入，处于不可读状态，此时读的话进程就会被挂起，这也是为什么会卡在这里的原因。
+
+定位到了软件中问题所在的代码，就需要找到内核中pselect处理时出错的代码。实际上出错的地方非常隐蔽不易发现，select中的fds参数记录了需要查询的文件句柄，由于需要查询的文件可能有很多，因此这里的fds并不是存储fd的数组，而是一段内存，这段的每一位数据均表示一个文件，例如：要查询2号文件，即将该段内存数据的第2位置为1即可，查询3号文件即将该段内存第3位置为1。同理可知，内核在检查需要查询的文件时，也是去查询每一位数据来得到文件的句柄，而问题正出在了这里。
+
+以下为正确的查询代码：
+
+```c
+static inline int FD_ISSET(int fd, struct fd_set *set)
+{
+    if (fd < 0 || fd >= FD_SETSIZE)
+		return 0;
+    long bit = set->fds_bits[fd / (sizeof(long) * 8)] & (1 << (fd & ((sizeof(long) * 8)-1)));
+    return bit != 0;
+}
+```
+
+若要查询2号文件是否需要被查询，则检测该段数据fds_bits的第2位是否为1即可，由于一段数据很大，单个的变量最大也就64位，无法表示全部，因此查询时需要遍历这个数组然后再查询指定一位是否为1，这里有一个公式可快速查询，其中`(sizeof(long) * 8)`表示数组中一个元素的位数，问题正出在这里，起初的代码**没有乘8**，得到的是一个元素的字节数而不是位数，实际上我们需要访问的是每一位信息而不是每一字节的信息。因此若文件句柄号不大于等于8就不会出问题，大于8就到了第8个字节而不是第8位。
+
+至于评测机出了该bug本地却无法复现是因为评测机上**父子进程调度执行的顺序**和本地不一样导致本地在执行到这里时管道文件确实已经先被写入了，而评测机还没来得及执行到写入的代码。
+
+### signal信号机制的实现
+
+前期的程序都没有用到**signal**机制，因此未实现signal不影响执行，而到了lmbench则需要用到signal，否则程序无法正确运行，因此决赛第二阶段也花了大量的时间实现和完善signal机制。
+
+signal机制实际上是一种**软中断**的实现，即某种signal来时，将回到用户态执行用户注册的处理程序，执行完成后再回到内核。如何实现**从内核切换到用户态，然后再从用户态回到内核中**，这一流程的实现便是signal实现的关键。
+
+从内核返回到**用户注册的signal处理程序**的地址去执行这一过程实现比较简单，直接将trap中保存的pc的值修改为用户注册的signal处理程序的地址即可。但在修改前我们需要保存原来的上下文信息，这里我选择的保存方式是**保存在用户栈**中。接着需要考虑的是在执行完后如何从用户态回到内核，仿照linux系统是通过**rt_sigreturn系统调用回到内核**，但用户的代码**不一定**需要有调用rt_sigreturn的代码，因此内核还需要**修改用户代码**的来执行rt_sigreturn系统调用。riscv下调用rt_sigreturn系统调用汇编代码为：
+
+```assembly
+li a7, 139
+ecall
+```
+
+二进程机器码为：
+
+```c
+{ 0x93, 0x08, 0xB0, 0x08, 0x73, 0x00, 0x00, 0x00 };
+```
+
+因此需要在用户空间中添加这几个字节的代码，然后修改返回地址即**ra寄存器**的值为用户空间中该段代码的地址。这样在执行完用户注册的signal处理程序后便会返回到这里执行rt_sigreturn系统调用返回内核。
+
+实现代码如signal.c中的下列两个函数所示：
+
+```c
+uchar sigrt_code[] = { 0x93, 0x08, 0xB0, 0x08, 0x73, 0x00, 0x00, 0x00 };
+void make_sigreturn_code(struct Process *proc)
+{
+    struct vma *vma = new_vma();
+    vma->va = SIG_CODE_START;
+    vma->size = PAGE_SIZE;
+    vma->prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+    vma->flag = PTE_R | PTE_W  | PTE_X | PTE_U;
+    vma->type = VMA_DATA;
+    vma->vmoff = 0;
+    vma->fsize = 0;
+    vma->foff = 0;
+    vma->file = NULL;
+    void *mem = vm_alloc_pages(1);
+    memcpy(mem, sigrt_code, 8);
+    mappages(proc->pg_t, vma->va, (uint64)mem - PV_OFFSET, 1, prot2pte(vma->prot));
+    add_vma(proc, vma);
+}
+
+void make_sigframe(struct Process *proc, int signo, void (*sa_handler)(int))
+{
+    void *sp = proc->tcontext.sp;
+    struct trap_context *frame = (uint64)sp - sizeof(struct trap_context);
+    memcpy(frame, &proc->tcontext, sizeof(struct trap_context));
+    sp = frame;
+    proc->tcontext.sp = sp;
+    proc->tcontext.ra = SIG_CODE_START;
+    proc->tcontext.sepc = sa_handler;
+    proc->tcontext.a0 = signo;
+}
+```
+
+首先调用`make_sigreturn_code`向用户空间添加调用rt_sigreturn的代码，当然这段代码在用户进程创建时就已经创建好了，并且固定在**SIG_CODE_START**地址处，即为**0x4000000000 - 4096**处，该地址为用户态进程最大寻址空间的最后一页。接着调用`make_sigframe`将trap保存的上下文保存到用户栈中，修改sp、ra、pc等状态寄存器的值，并将a0设置为该信号的id作为用户态处理程序的第一个参数。
+
+### 系统性能调优
+
+将整个lmbench测试代码正确的跑完花费了我大量的时间，此时对性能调优所剩时间已不多，在评测机进行测试时得分很低，唯一得分较高的还是fork+/bin/sh的测试结果较为理想。后来发现评测机运行时卡在了写入600多M文件的命令上，本地用qemu进行调试时未出现该问题，问题出现的原因是sd卡读写速度太慢导致超时，这里也未能来得及解决，有些遗憾，因为后的评测指令在qemu上是能够正常跑的，只是限于k210 sd卡读写驱动写的不好导致读写速度很慢。因为我不是很了解sd卡读写的交互逻辑，驱动也是照着官方给的demo模仿着写的，出了问题也不是很奇怪，期待后面可以继续改进。
+
+对系统性能的调优完善的不是很好，不过总结起来还是得从这几个地方入手：
+
+- 用户、内核态切换时上下文保存速度优化。
+- 系统调用实现机制优化。
+- 优化内核代码逻辑、减少运行时间。
+- 内核中使用高效的数据结构如红黑树等来提高文件系统、vma管理、内存分配等模块的速度。
+- sd卡读写驱动优化。
+- 使用更高效的进程调度算法。
+
+这次比赛学到了不少知识，也写了很多的代码实现了一个简单的系统，期待日后有时间能够进一步优化和完善这个系统。
+
 ## 决赛第一阶段
 
 决赛第一阶段两个任务分别为移植busybox与lua，由于初赛完成的系统调用较少且不完善，因此决赛第一阶段需要进一步修改与适配，需要解决的问题主要由以下几点：

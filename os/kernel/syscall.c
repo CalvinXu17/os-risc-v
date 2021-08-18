@@ -16,6 +16,12 @@ void syscall_handler(struct trap_context *context)
     a0 = context->a0;
     if(context->a7 >=0 && context->a7 < SYS_NR)
     {
+        #ifdef _STRACE
+        //if((int)context->a0 < 0)
+        {
+            printk("hartid %d pid %d pc: %lx %s(%lx, %lx, %lx, %lx, %lx, %lx) = ", gethartid(), getcpu()->cur_proc->pid, context->sepc, syscall_name[context->a7], a0, context->a1, context->a2, context->a3, context->a4, context->a5);
+        }
+        #endif
         int (*syscall)(struct trap_context *);
         syscall = syscall_table[context->a7];
         syscall(context);
@@ -27,9 +33,9 @@ void syscall_handler(struct trap_context *context)
         context->a0 = -1;
     }
     #ifdef _STRACE
-    if((int)context->a0 < 0)
+    //if((int)context->a0 < 0)
     {
-        printk("pid %d pc: %lx %s(%lx, %lx, %lx, %lx, %lx, %lx) = %lx\n", getcpu()->cur_proc->pid, context->sepc, syscall_name[context->a7], a0, context->a1, context->a2, context->a3, context->a4, context->a5, context->a0);
+        printk("%lx\n", context->a0);
     }
     #endif
 }
@@ -342,16 +348,24 @@ MAKE_SYSCALL31(readv);
 MAKE_SYSCALL31(writev);
 MAKE_SYSCALL21(clock_gettime);
 MAKE_SYSCALL41(readlinkat);
-MAKE_SYSCALL11(fcntl);
-MAKE_SYSCALL01(rt_sigaction);
+MAKE_SYSCALL31(fcntl);
 MAKE_SYSCALL01(exit_group);
 MAKE_SYSCALL41(fstatat);
-MAKE_SYSCALL31(ppoll);
 MAKE_SYSCALL41(clock_nanosleep);
 MAKE_SYSCALL21(statfs);
 MAKE_SYSCALL31(syslog);
 MAKE_SYSCALL41(faccessat);
 MAKE_SYSCALL21(ioctl);
+
+MAKE_SYSCALL41(utimensat);
+MAKE_SYSCALL21(getrusage);
+
+MAKE_SYSCALL51(ppoll);
+MAKE_SYSCALL61(pselect6);
+MAKE_SYSCALL41(rt_sigaction);
+MAKE_SYSCALL00(rt_sigreturn);
+MAKE_SYSCALL21(kill);
+MAKE_SYSCALL31(msync);
 
 void syscall_init(void)
 {
@@ -410,13 +424,21 @@ void syscall_init(void)
     syscall_table[SYS_readlinkat] = do_sys_readlinkat;
     syscall_table[SYS_fcntl] = do_sys_fcntl;
     syscall_table[SYS_fstatat] = do_sys_fstatat;
-    syscall_table[SYS_ppoll] = do_sys_ppoll;
-
-    syscall_table[SYS_rt_sigaction] = do_sys_rt_sigaction;
+    
     syscall_table[SYS_exit_group] = do_sys_exit_group;
     syscall_table[SYS_clock_nanosleep] = do_sys_clock_nanosleep;
     syscall_table[SYS_statfs] = do_sys_statfs;
     syscall_table[SYS_syslog] = do_sys_syslog;
     syscall_table[SYS_faccessat] = do_sys_faccessat;
     syscall_table[SYS_ioctl] = do_sys_ioctl;
+
+    syscall_table[SYS_utimensat] = do_sys_utimensat;
+    syscall_table[SYS_getrusage] = do_sys_getrusage;
+
+    syscall_table[SYS_ppoll] = do_sys_ppoll;
+    syscall_table[SYS_pselect6] = do_sys_pselect6;
+    syscall_table[SYS_rt_sigaction] = do_sys_rt_sigaction;
+    syscall_table[SYS_rt_sigreturn] = do_sys_rt_sigreturn;
+    syscall_table[SYS_kill] = do_sys_kill;
+    syscall_table[SYS_msync] = do_sys_msync;
 }

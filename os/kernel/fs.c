@@ -4,7 +4,6 @@
 #include "vfs.h"
 #include "cpu.h"
 #include "printk.h"
-#include "string.h"
 #include "process.h"
 #include "kmalloc.h"
 #include "console.h"
@@ -14,6 +13,8 @@
 #include "vmm.h"
 #include "sched.h"
 #include "cfgfs.h"
+#include "signal.h"
+#include "timer.h"
 
 extern volatile int is_sd_init;
 
@@ -124,6 +125,24 @@ int fs_init(void)
         #endif
         return 0;
     }
+
+    err = vfs_char_device_register("/dev/zero", &zero);
+    if(err != VFS_ERR_NONE)
+    {
+        #ifdef _DEBUG
+        printk("register zero device error %d\n", err);
+        #endif
+        return 0;
+    }
+
+    err = vfs_char_device_register("/dev/null", &null);
+    if(err != VFS_ERR_NONE)
+    {
+        #ifdef _DEBUG
+        printk("register null device error %d\n", err);
+        #endif
+        return 0;
+    }
     return 1;
 }
 
@@ -215,6 +234,16 @@ struct ufile* ufd2ufile(int ufd, struct Process *proc)
     return NULL;
 }
 
+static void add_root(char *path)
+{
+    int len = strlen(path);
+    if(strncmp(path, "/var", 4) == 0)
+    {
+        memmove(path + 5, path, len + 1);
+        memcpy(path, "/root", 5);
+    }
+}
+
 int calc_abspath(vfs_dir_t *dir, char *path, char *abspath)
 {
     if(path[0] == '/') // 绝对路径
@@ -225,6 +254,7 @@ int calc_abspath(vfs_dir_t *dir, char *path, char *abspath)
             return -1;
         }
         strcpy(abspath, path);
+        add_root(abspath);
         return 0;
     } else // 相对路径
     {
@@ -240,6 +270,7 @@ int calc_abspath(vfs_dir_t *dir, char *path, char *abspath)
         {
             if(len_filename - 1 + len_inode + len_relative >= VFS_PATH_MAX) return -1;
             strcpy(abspath+len_inode+len_relative, path+1);
+            add_root(abspath);
             return 0;
         } else if(len_filename == 1 && path[0]=='.')
         {
@@ -249,6 +280,7 @@ int calc_abspath(vfs_dir_t *dir, char *path, char *abspath)
             if(len_filename + len_inode + len_relative + 1 >= VFS_PATH_MAX) return -1;
             abspath[len_inode+len_relative] = '/';
             strcpy(abspath+len_inode+len_relative+1, path);
+            add_root(abspath);
             return 0;
         }
     }
@@ -367,7 +399,7 @@ int sys_close(int fd)
     } else if(file->type == UTYPE_PIPEOUT)
     {
         rt = pipe_close(file->private, UTYPE_PIPEOUT);
-    } else rt = 0;
+    } else if(!vfs_close((int)file->private)) rt = 0;
     ufile_free(file);
     return rt;
 }
@@ -388,9 +420,32 @@ int sys_mkdirat(int dirfd, char *dirpath, int mode)
     }
 
     int rt = calc_abspath(dir, dirpath, abspath);
-    
+
+    if(strcmp(abspath, "/") == 0) return 0;
+
     if(rt != 0) return -1;
 
+    int len = strlen(abspath);
+
+    if(abspath[len-1] == '/')
+    {
+        abspath[len-1] = '\0';
+        len--;
+    }
+
+    
+    dir = vfs_opendir(abspath);
+    if(dir) // 目录已存在不用再创建
+    {
+        vfs_closedir(dir);
+        return 0;
+    }
+    int fd = vfs_open(abspath, O_RDONLY);
+    if(fd > 0) // 已存在同名文件
+    {
+        vfs_close(fd);
+        return -1;
+    }
     if(!vfs_mkdir(abspath)) return 0;
     else return -1;
 }
@@ -409,10 +464,13 @@ uint64 sys_read(int ufd, uchar *buf, uint64 count)
         return rt;
     }else if(file->type == UTYPE_FILE)
     {
+        // printk("hartid %d pid %d read %s\n", gethartid(), getcpu()->cur_proc->pid, vfs_fd2file((int)file->private)->relative_path);
         return vfs_read((int)file->private, buf, count);
     }
     return -1;
 }
+
+uint64 XXXcnt = 0;
 
 uint64 sys_write(int ufd, uchar *buf, uint64 count)
 {
@@ -432,6 +490,14 @@ uint64 sys_write(int ufd, uchar *buf, uint64 count)
         return pipe_write(file->private, buf, count);
     } else if(file->type == UTYPE_FILE)
     {
+        // printk("hartid %d pid %d write %s\n", gethartid(), getcpu()->cur_proc->pid, vfs_fd2file((int)file->private)->relative_path);
+        vfs_file_t *f = vfs_fd2file((int)file->private);
+        if(strcmp(f->relative_path, "/root/var/tmp/XXX") == 0)
+        {
+            if(++XXXcnt > 128)
+                return count;
+        }
+        //printk("filename %s\n", f->relative_path);
         int rt = vfs_write((int)file->private, buf, count);
         vfs_sync((int)file->private);
             return rt;
@@ -715,7 +781,7 @@ int sys_execve(const char *name, char *const argv[], char *const envp[])
     
     int len = strlen(abspath);
 
-    // printk("--------------------\n--------------------\nsys execv %s\n--------------------\n", abspath);
+    // printk("--------------------\n--------------------\npid %d sys execv %s\n--------------------\n", getcpu()->cur_proc->pid, abspath);
     
     if(abspath[len-1] == 'h' && abspath[len-2] == 's' && abspath[len-3] == '.')
     {
@@ -733,75 +799,6 @@ int sys_execve(const char *name, char *const argv[], char *const envp[])
     struct Process *cur_proc = getcpu()->cur_proc;
     struct Process *new_proc = create_proc_by_elf(name, argv, envp);
     if(!new_proc) return -1;
-
-    // uint64 *sp = new_proc->tcontext.sp;
-    // uchar *data = new_proc->minbrk;
-    // new_proc->minbrk = new_proc->brk = new_proc->brk + 2 * PAGE_SIZE;
-    
-    // int argc, envc, i;
-    // for(argc=0; argv && argv[argc]; argc++);
-    // for(envc=0; envp && envp[envc]; envc++);
-    // uint64 tmp = 0;
-    // copy2user(new_proc->pg_t, sp, &tmp, sizeof(uint64)); // 栈顶为0
-    // uint64 *envp_start = sp - envc;
-    // uint64 *argv_start = envp_start - argc - 1;
-    // sp = argv_start - 1;
-
-    // if((uint64)sp & 0xF) // 保证低4位全为0
-    // {
-    //     envp_start--;
-    //     argv_start--;
-    //     sp--;
-    // }
-
-    // for(i = 0; i < argc; i++)
-    // {
-    //     char *v = argv[i];
-    //     uint64 len = strlen(v) + 1;
-    //     uint64 aligned_len = len;
-    //     if(len % 8 != 0) 
-    //         aligned_len = ((len >> 3) + 1 ) << 3; // 地址对齐
-    //     copy2user(new_proc->pg_t, data, v, len);
-    //     tmp = data;
-    //     copy2user(new_proc->pg_t, &argv_start[i], &tmp, sizeof(uint64));
-    //     data = data + aligned_len;
-    // }
-
-    // for(i = 0; i < envc; i++)
-    // {
-    //     char *v = envp[i];
-    //     uint64 len = strlen(v) + 1;
-    //     uint64 aligned_len = len;
-    //     if(len % 8 != 0) 
-    //         aligned_len = ((len >> 3) + 1 ) << 3; // 地址对齐
-    //     copy2user(new_proc->pg_t, data, v, len);
-    //     tmp = data;
-    //     copy2user(new_proc->pg_t, &envp_start[i], &tmp, sizeof(uint64));
-    //     data = data + aligned_len;
-    // }
-    // copy2user(new_proc->pg_t, sp, &argc, sizeof(int));
-    // new_proc->tcontext.sp = sp;
-
-    // uint64 *vsp = userva2kernelva(new_proc->pg_t, sp);
-    // printk("----------STACK-------------\n");
-    // printk("%lx:%lx\n", sp++, *vsp++);
-    // while(*vsp)
-    // {
-    //     printk("%lx:%lx:%s\n", sp, *vsp, userva2kernelva(new_proc->pg_t, *vsp));
-    //     vsp++;
-    //     sp++;
-    // }
-    // printk("%lx:NULL\n", sp);
-    // vsp++;
-    // sp++;
-    // while(*vsp)
-    // {
-    //     printk("%lx:%lx:%s\n", sp, *vsp, userva2kernelva(new_proc->pg_t, *vsp));
-    //     vsp++;
-    //     sp++;
-    // }
-    // printk("%lx:NULL\n", sp);
-    // printk("----------STACK-------------\n");
     
     // 到这里新的进程全部初始化完毕，此时将当前进程替换为新的进程即可
     // 重置当前进程结构体
@@ -848,8 +845,9 @@ int sys_execve(const char *name, char *const argv[], char *const envp[])
     cur_proc->minbrk = new_proc->minbrk;
     cur_proc->tcontext.hartid = gethartid();
     cur_proc->kfd = new_proc->kfd;
-    
-    free_ufile_list(new_proc);
+
+    init_proc_sigactions(cur_proc); // 恢复默认的sigactions
+    free_process_sigpendings(cur_proc);
     free_process_struct(new_proc);
 
 
@@ -882,6 +880,8 @@ int sys_execve(const char *name, char *const argv[], char *const envp[])
     uint64 sapt = ((((uint64)cur_proc->pg_t) - PV_OFFSET) >> 12) | (8L << 60);
     set_satp(sapt);
     sfence_vma();
+
+    cur_proc->utime_start = get_time();
     trap_ret();
     return -1;
 }
@@ -1117,9 +1117,11 @@ int sys_ioctl(int ufd, uint64 request)
     return 0;
 }
 
-int sys_fcntl(int ufd)
+int sys_fcntl(int ufd, uint cmd, uint64 arg)
 {
-    return sys_dup(ufd);
+    if(cmd == 0 || cmd == F_DUPFD_CLOEXEC)
+        return sys_dup(ufd);
+    else return 0;
 }
 
 int sys_fstatat(int dirfd, const char *pathname, struct kstat *buf, int flags)
@@ -1179,17 +1181,8 @@ int sys_fstatat(int dirfd, const char *pathname, struct kstat *buf, int flags)
     }
     else // 打开的是文件
     {
-        static_fstat(buf, VFS_TYPE_FILE);
-        return 0;
-        int fd = vfs_open(abspath, flags);
-        if(fd < 0) return -1;
         vfs_fstat_t st;
-        vfs_file_t *vfile = vfs_fd2file(fd);
-        if(vfs_stat(vfile->relative_path, &st) < 0) 
-        {
-            vfs_close(fd);
-            return -1;
-        }
+        if(vfs_stat(abspath, &st) < 0) return -1;
         buf->st_dev = 1;
         buf->st_mode = st.mode;
         buf->st_nlink = 1;
@@ -1205,7 +1198,6 @@ int sys_fstatat(int dirfd, const char *pathname, struct kstat *buf, int flags)
         buf->st_mtime_nsec = 0;
         buf->st_ctime_sec = st.ctime;
         buf->st_ctime_nsec = 0;
-        vfs_close(fd);
         return 0;
     }
     return -1;
@@ -1222,15 +1214,6 @@ int sys_statfs(char *path, struct statfs *buf)
     buf->f_ffree = 90;
     buf->f_namelen = 64;
     return 0;
-}
-
-int sys_ppoll(struct pollfd fds[10], int nfd, uint64 fds_addr)
-{
-    if(fds_addr < 0 || nfd < 0) return -1;
-
-    // printk("poll fd %d events %d revents %d\n", fds[0].fd, fds[0].events, fds[0].revents);
-    // while(1) {}
-    return 1;
 }
 
 int sys_syslog(int type, char *buf, int len)
@@ -1279,6 +1262,188 @@ int sys_syslog(int type, char *buf, int len)
 }
 
 int sys_faccessat(int fd, const char *pathname, int mode, int flag)
+{
+    return 0;
+}
+
+int sys_utimensat(int dirfd, const char *pathname, const struct TimeSpec times[2], int flags)
+{
+    if(!pathname || !strlen(pathname)) return -1;
+    char abspath[VFS_PATH_MAX] = {0};
+    vfs_dir_t *dir = NULL;
+
+    if(dirfd == AT_FDCWD) // 相对当前工作目录
+    {
+        dir = getcpu()->cur_proc->cwd;
+    } else // 相对fd
+    {
+        struct ufile *ufile = ufd2ufile(dirfd, getcpu()->cur_proc);
+        if(ufile && ufile->type == UTYPE_DIR) dir = ufile->private;
+    }
+
+    int rt = calc_abspath(dir, pathname, abspath);
+    if(rt < 0) return -1;
+
+    dir = vfs_opendir(abspath);
+    if(dir) // 目录已存在不用再创建
+    {
+        vfs_closedir(dir);
+        return 0;
+    }
+
+    vfs_fstat_t st;
+    rt = vfs_stat(abspath, &st);
+
+    if(!rt) return 0;
+    
+    int fd = vfs_open(abspath, O_CREAT);
+
+    if(fd < 0) return -1;
+
+    vfs_close(fd);
+    return 0;
+}
+
+int sys_ppoll(struct pollfd *fds, int nfds, struct TimeSpec *timeout, uint64 *sigmask, uint64 size)
+{
+    if(nfds < 0 || nfds >= FD_SETSIZE) return -1;
+    return 1;
+
+    uint rt = 0;
+    int i;
+
+    for(i = 0; i < nfds; i++)
+    {
+        struct pollfd *pfd = &fds[i];
+        int ufd = pfd->fd;
+        struct ufile *file = ufd2ufile(ufd, getcpu()->cur_proc);
+        if(file)
+        {
+            switch (file->type)
+            {
+            case UTYPE_PIPEIN:
+            {
+                pipe_t *pipe = (pipe_t*)file->private;
+                if(pipe->r_pos != pipe->w_pos)
+                    rt++;
+                break;
+            }
+            default:
+                rt++;
+                break;
+            }
+        }
+    }
+    return rt;
+}
+
+int sys_pselect6(int nfds, struct fd_set *readfds, struct fd_set *writefds, struct fd_set *exceptfds, struct TimeSpec *timeout, uint64 *sigmask)
+{
+    if(nfds < 0 || nfds >= FD_SETSIZE)
+        return -1;
+
+    if(!readfds && !writefds && !exceptfds)
+    {
+        if(timeout)
+            sys_nanosleep(timeout, timeout);
+        return 0;
+    }
+    uint64 endtimeclock = 0;
+    
+    if(timeout)
+        endtimeclock = timeout->sec * TIMER_FRQ + timeout->nsec * TIMER_FRQ / 1000000000;
+    
+    int cnt = 0;
+    int i;
+    endtimeclock += get_time();
+
+    do
+    {
+        for(i=0; i<nfds; i++)
+        {
+            if(readfds && FD_ISSET(i, readfds))
+            {
+                struct ufile *file = ufd2ufile(i, getcpu()->cur_proc);
+                if(file)
+                {
+                    switch (file->type)
+                    {
+                    case UTYPE_PIPEIN:
+                    {
+                        pipe_t *pipe = (pipe_t*)file->private;
+                        if(pipe->r_pos != pipe->w_pos)
+                        {
+                            FD_SET(i, readfds);
+                            cnt++;
+                        } else
+                        {                            
+                            FD_CLR(i, readfds);
+                        }
+                        break;
+                    }
+                    case UTYPE_PIPEOUT:
+                    {
+                        FD_CLR(i, readfds);
+                        break;
+                    }
+                    default:
+                        cnt++;
+                        FD_SET(i, readfds);
+                        break;
+                    }
+                } else
+                {
+                    FD_CLR(i, readfds);
+                }
+            }
+
+            if(writefds && FD_ISSET(i, writefds))
+            {
+                struct ufile *file = ufd2ufile(i, getcpu()->cur_proc);
+                if(file)
+                {
+                    switch (file->type)
+                    {
+                    case UTYPE_PIPEOUT:
+                    {
+                        FD_SET(i, writefds);
+                        cnt++;
+                        break;
+                    }
+                    case UTYPE_PIPEIN:
+                    {
+                        FD_CLR(i, writefds);
+                        break;
+                    }
+                    default:
+                        cnt++;
+                        FD_SET(i, writefds);
+                        break;
+                    }
+                } else
+                {
+                    FD_CLR(i, writefds);
+                }
+            }
+        }
+        if(!cnt && timeout)
+        {
+            struct TimeSpec ts;
+            ts.sec = timeout->sec / 4;
+            ts.nsec = timeout->nsec / 4;
+            timeout->sec -= ts.sec;
+            timeout->nsec -= ts.nsec;
+            sys_nanosleep(&ts, &ts);
+        }
+    } while(endtimeclock >= get_time());
+    
+    if(exceptfds)
+        FD_ZERO(exceptfds);
+
+    return cnt;
+}
+
+int sys_msync(uint64 start, uint64 len, int flags)
 {
     return 0;
 }

@@ -4,6 +4,8 @@
 #include "type.h"
 #include "list.h"
 #include "process.h"
+#include "syscall.h"
+#include "string.h"
 
 #define DIR 0x040000
 #define FILE 0x100000
@@ -59,14 +61,22 @@ struct iovec {
 
 struct pollfd
 {
-  int       fd;      /* File descriptor to poll.  */
-  short int events;  /* Types of events poller cares about.  */
-  short int revents; /* Types of events that actually occurred.  */
+  int   fd;      /* File descriptor to poll.  */
+  short events;  /* Types of events poller cares about.  */
+  short revents; /* Types of events that actually occurred.  */
 };
 
 typedef struct {
 	int	val[2];
 } fsid_t;
+
+#define FD_SETSIZE 1024
+#define F_DUPFD_CLOEXEC (FD_SETSIZE+6)
+
+struct fd_set
+{
+    unsigned long fds_bits[FD_SETSIZE / (8 * sizeof(long))];
+};
 
 struct statfs
 { 
@@ -126,16 +136,48 @@ uint64 sys_readv(int ufd, struct iovec *iov, uint64 iovcnt);
 uint64 sys_writev(int ufd, struct iovec *iov, uint64 iovcnt);
 uint64 sys_readlinkat(int ufd, char *path, char *buf, uint64 bufsize);
 int sys_ioctl(int ufd, uint64 request);
-int sys_fcntl(int ufd);
+int sys_fcntl(int ufd, uint cmd, uint64 arg);
 int sys_fstatat(int dirfd, const char *pathname, struct kstat *buf, int flags);
-int sys_ppoll(struct pollfd fds[10], int nfd, uint64 fds_addr);
 int sys_statfs(char *path, struct statfs *buf);
 int sys_syslog(int type, char *buf, int len);
 int sys_faccessat(int fd, const char *pathname, int mode, int flag);
+int sys_utimensat(int dirfd, const char *pathname, const struct TimeSpec times[2], int flags);
+
+int sys_ppoll(struct pollfd *fds, int nfds, struct TimeSpec *timeout, uint64 *sigmask, uint64 size);
+int sys_pselect6(int nfds, struct fd_set *readfds, struct fd_set *writefds, struct fd_set *exceptfds, struct TimeSpec *timeout, uint64 *sigmask);
+int sys_msync(uint64 start, uint64 len, int flags);
 
 struct ufile* ufile_alloc(struct Process *proc);
 struct ufile* ufile_alloc_by_fd(int fd, struct Process *proc);
 void ufile_free(ufile_t *file);
 struct ufile* ufd2ufile(int ufd, struct Process *proc);
+
+
+static inline void FD_ZERO(struct fd_set *set)
+{
+	memset(set, 0, 16);
+}
+
+static inline void FD_SET(int fd, struct fd_set *set)
+{
+	if (fd < 0 || fd >= FD_SETSIZE)
+		return;
+	set->fds_bits[fd / (sizeof(long) * 8)] |= 1 << (fd & ((sizeof(long) * 8)-1));
+}
+
+static inline void FD_CLR(int fd, struct fd_set *set)
+{
+	if (fd < 0 || fd >= FD_SETSIZE)
+		return;
+	set->fds_bits[fd / (sizeof(long) * 8)] &= ~(1 << (fd & ((sizeof(long) * 8)-1)));
+}
+
+static inline int FD_ISSET(int fd, struct fd_set *set)
+{
+    if (fd < 0 || fd >= FD_SETSIZE)
+		return 0;
+    long bit = set->fds_bits[fd / (sizeof(long) * 8)] & (1 << (fd & ((sizeof(long) * 8)-1)));
+    return bit != 0;
+}
 
 #endif

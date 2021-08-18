@@ -58,7 +58,7 @@ void osmain(uint64 hartid)
         //     sbi_send_ipi(&mask); // 启动其他的核
         // }
         // __sync_synchronize();
-        // init_done = 1;
+        init_done = 1;
     } else
     {
         while(!init_done) {}

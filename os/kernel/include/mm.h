@@ -4,7 +4,7 @@
 #ifdef _K210
 #define PM_SIZE  0x600000 // 6M
 #else
-#define PM_SIZE  0x600000
+#define PM_SIZE  0x800000
 #endif
 
 #define PM_START 0x80000000

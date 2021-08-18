@@ -15,6 +15,7 @@ pipe_t* pipe_alloc(void)
 uint64 pipe_read(pipe_t *pip, char *buf, uint64 count)
 {
     int cnt = 0;
+    struct Process *proc = getcpu()->cur_proc;
     while(count > 0)
     {
         lock(&pip->mutex);
@@ -25,6 +26,8 @@ uint64 pipe_read(pipe_t *pip, char *buf, uint64 count)
         }
         unlock(&pip->mutex);
         P(&pip->sem);
+        if(proc->receive_kill > 0)
+            break;
         lock(&pip->mutex);
         *buf = pip->buf[pip->r_pos++];
         pip->r_pos %= PIPE_BUFF_SIZE;

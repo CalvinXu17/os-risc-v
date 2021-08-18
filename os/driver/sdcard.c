@@ -3,6 +3,7 @@
 #include "fpioa.h"
 #include "gpiohs.h"
 #include "printk.h"
+#include "sysctl.h"
 
 SD_CardInfo cardinfo;
 
@@ -10,6 +11,18 @@ uchar sdcard_init()
 {
 	fpioa_pin_init();
 	return sd_init();
+}
+
+uint32 spi_set_clk_rate(spi_device_num_t spi_num, uint32 spi_clk)
+{
+    uint32 spi_baudr = sysctl_clock_get_freq(SYSCTL_CLOCK_SPI0 + spi_num) / spi_clk;
+    if (spi_baudr < 2)
+        spi_baudr = 2;
+    else if (spi_baudr > 65534)
+        spi_baudr = 65534;
+    volatile spi_t *spi_controller = spi[spi_num];
+    spi_controller->baudr = spi_baudr;
+    return sysctl_clock_get_freq(SYSCTL_CLOCK_SPI0 + spi_num) / spi_clk;
 }
 
 void SD_CS_HIGH(void)
@@ -24,13 +37,12 @@ void SD_CS_LOW(void)
 
 void SD_HIGH_SPEED_ENABLE(void)
 {
-    // spi_set_clk_rate(SPI_DEVICE_0, 10000000);
+    spi_set_clk_rate(SPI_DEVICE_0, 10000000);
 }
 
 static void sd_lowlevel_init(uchar spi_index)
 {
     gpiohs_set_drive_mode(7, GPIO_DM_OUTPUT);
-    // spi_set_clk_rate(SPI_DEVICE_0, 200000);     /*set clk rate*/
 }
 
 // TODO: 保持与评测机一致，为SPI_CHIP_SELECT_0而不是SPI_CHIP_SELECT_3
@@ -130,20 +142,36 @@ static void sd_get_response_R7_rest(uchar *frame)
  *         - status 110: Data rejected due to a Write error.
  *         - status 111: Data rejected due to other error.
  */
+
+static void detect_busy(void)
+{
+	uchar response;
+	sd_read_data(&response, 1);
+	while (response != 0xff)
+		sd_read_data(&response, 1);
+	/*!< Return response */
+}
+
 static uchar sd_get_data_write_response(void)
 {
 	uchar response;
+	int timeout = 0xfff;
 	/*!< Read resonse */
-	sd_read_data(&response, 1);
-	/*!< Mask unused bits */
-	response &= 0x1F;
-	if (response != 0x05)
-		return 0xFF;
-	/*!< Wait null data */
-	sd_read_data(&response, 1);
-	while (response == 0)
+	while (--timeout) {
 		sd_read_data(&response, 1);
-	/*!< Return response */
+		response &= 0x1F;
+		if (response == 0x05)
+			break;
+	}
+
+	if (0 == timeout) {
+		#ifdef _DEBUG
+		printk("WAITREAD END failed\n");
+		#endif
+		return 0xff;
+	}
+	/*!< Wait null data */
+	detect_busy();
 	return 0;
 }
 
@@ -519,6 +547,7 @@ uchar sd_init(void)
 		return 0xff;
 	if (0 != check_block_size()) 
 		return 0xff;
+	SD_HIGH_SPEED_ENABLE();
 	return sd_get_cardinfo(&cardinfo);
 }
 
@@ -580,15 +609,14 @@ uchar sd_read_sector(uchar *data_buff, uint32 sector, uint32 count)
 uchar sd_write_sector(uchar *data_buff, uint32 sector, uint32 count)
 {
 	uchar token[2] = {0xFF, 0x00}, dummpy_crc[2] = {0xFF, 0xFF};
-
+	uchar flag = 0;
     if (count == 1){
+		flag = 0;
         token[1] = SD_START_DATA_SINGLE_BLOCK_WRITE;
         sd_send_cmd(SD_CMD24, sector, 0);
     } else{
+		flag = 1;
         token[1] = SD_START_DATA_MULTIPLE_BLOCK_WRITE;
-        sd_send_cmd(SD_ACMD23, count, 0);
-        sd_get_response_R1();
-        sd_end_cmd();
         sd_send_cmd(SD_CMD25, sector, 0);
     }
 
@@ -602,7 +630,8 @@ uchar sd_write_sector(uchar *data_buff, uint32 sector, uint32 count)
 
         while (count)
     {
-        sd_write_data(token, 2);
+		sd_write_data(token, 1);
+        sd_write_data(token+1, 1);
         sd_write_data(data_buff, 512);
         sd_write_data(dummpy_crc, 2);
 
@@ -618,9 +647,17 @@ uchar sd_write_sector(uchar *data_buff, uint32 sector, uint32 count)
         count--;
     }
 
-    sd_end_cmd();
-    sd_end_cmd();
+	if (flag) {
+		char end = 0xfd;
+		sd_write_data(&end, 1);
+		detect_busy();
+		sd_end_cmd();
+		sd_send_cmd(SD_CMD12, 0, 0);
+		sd_get_response_R1();
+		sd_end_cmd();
+	}
 
+	sd_end_cmd();
     if (count > 0) {
 		#ifdef _DEBUG
         printk("Not all sectors are written!\n");

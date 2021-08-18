@@ -10,6 +10,7 @@
 #include "fs.h"
 #include "pipe.h"
 #include "vmm.h"
+#include "signal.h"
 
 int sys_clone(uint flags, void *stack, int *ptid, uint64 tls, int *ctid)
 {
@@ -29,7 +30,9 @@ int sys_clone(uint flags, void *stack, int *ptid, uint64 tls, int *ctid)
     strncpy(abspath+len_inode, dir->relative_path, len_relative);
     child->cwd = vfs_opendir(abspath);
 
-    // printk("clone ppid %d pid %d childfd %d cwd %lx\n", parent->pid, child->pid, child->kfd, child->cwd);
+    #ifdef _DEBUG
+    printk("clone ppid %d pid %d childfd %d cwd %lx\n", parent->pid, child->pid, child->kfd, child->cwd);
+    #endif
     if(!child->cwd)
     {
         printk("abspath %s\n", abspath);
@@ -57,7 +60,7 @@ int sys_clone(uint flags, void *stack, int *ptid, uint64 tls, int *ctid)
         vma = vma_list_node2vma(l);
         struct vma *nvma = new_vma();
 
-        if(vma->type == VMA_PROG)
+        if((vma->type & VMA_PROG) && (vma->prot & PROT_EXEC)) // 可执行部分才使用写时复制
         {
             nvma->va = vma->va;
             // vma->pa = (uint64)mem - PV_OFFSET;
@@ -121,7 +124,6 @@ int sys_clone(uint flags, void *stack, int *ptid, uint64 tls, int *ctid)
     add_before(&parent->child_list_head, &child->child_list_node);
 
     // TODO ADD UFILE CLONE
-    free_ufile_list(child);
 
     l = parent->ufiles_list_head.next;
     while(l != &parent->ufiles_list_head)
@@ -230,6 +232,8 @@ int sys_clone(uint flags, void *stack, int *ptid, uint64 tls, int *ctid)
         add_before(&child->ufiles_list_head, &cfile->list_node);
     }
 
+    copy_proc_sigactions(child, parent);
+
     unlock(&parent->lock);
     child->tcontext.a0 = 0; // 子进程返回值为0
     lock(&list_lock);
@@ -313,7 +317,9 @@ int sys_wait4(int pid, int *code, int options)
         {
             while(1)
             {
-                P(&proc->signal); // 阻塞
+                P(&proc->sleep_lock); // 阻塞
+                if(proc->receive_kill > 0)
+                    break;
                 lock(&proc->lock);
                 l = proc->child_list_head.next;
                 while(l != &proc->child_list_head)
@@ -339,6 +345,7 @@ int sys_wait4(int pid, int *code, int options)
                 }
                 unlock(&proc->lock);
             }
+            return -1;
         } else // 指定子进程
         {
             lock(&proc->lock);
@@ -351,7 +358,9 @@ int sys_wait4(int pid, int *code, int options)
                     while(1)
                     {
                         unlock(&proc->lock);
-                        P(&proc->signal);
+                        P(&proc->sleep_lock);
+                        if(proc->receive_kill > 0)
+                            break;
                         lock(&proc->lock);
                         if(p->status == PROC_DEAD)
                         {
@@ -367,8 +376,9 @@ int sys_wait4(int pid, int *code, int options)
                             free_process_struct(p);
                             unlock(&proc->lock);
                             return pid;
-                        } else V(&proc->signal); // 说明此信号是其他子进程发出的，因此需要V还原信号继续等待
+                        } else V(&proc->sleep_lock); // 说明此信号是其他子进程发出的，因此需要V还原信号继续等待
                     }
+                    return -1;
                 }
                 l = l->next;
             }
@@ -378,13 +388,16 @@ int sys_wait4(int pid, int *code, int options)
     }
     return -1;
 }
+extern int timerprint;
 
 void sys_exit(int code)
 {
     struct Process *proc = getcpu()->cur_proc;
     #ifdef _DEBUG
-    printk("exit pid %d code %d\n", proc->pid, code);
+    printk("\n\nexit pid %d code %d\n\n\n", proc->pid, code);
     #endif
+    if(proc->pid == 1)
+        timerprint = 0;
     lock(&proc->lock);
     proc->status = PROC_DEAD; // 置状态位为DEAD
     proc->end_time = get_time();
@@ -392,10 +405,12 @@ void sys_exit(int code)
     struct Process *parent = proc->parent;
     lock(&parent->lock);
     list *l = proc->child_list_head.next;
+
     while(l!=&proc->child_list_head) // 将子进程加入到父进程的子进程队列中
     {
         struct Process *child = child_list_node2proc(l);
         l = l->next;
+        child->parent = NULL;
         if(child->status == PROC_DEAD) // 有未释放的子进程pcb则释放，否则将子进程加入其父进程
         {
             if(child->k_stack)
@@ -404,15 +419,18 @@ void sys_exit(int code)
         } else add_before(&parent->child_list_head, &child->child_list_node);
     }
     unlock(&parent->lock);
-    
+
     switch2kpgt(); // 先切换回内核页表再释放当前进程页表
     free_process_mem(proc);
     free_pagetable(proc->pg_t);
     free_ufile_list(proc);
+    free_process_sigpendings(proc);
     if(proc->cwd) vfs_closedir(proc->cwd);
     if(proc->kfd) vfs_close(proc->kfd);
-    V(&parent->signal);
-    move_switch2sched(proc, &dead_list);
+
+    send_signal(parent, SIGCHLD); // 向父进程发送子进程退出的信号
+    V(&parent->sleep_lock); // 唤醒父进程
+    move_switch2sched(proc, &dead_list); // 切换到调度程序
 }
 
 int sys_getppid(void)
@@ -480,16 +498,16 @@ int sys_gettimeofday(struct TimeVal *time, int tz)
     return 0;
 }
 
-int sys_nanosleep(struct TimeVal *timein, struct TimeVal *timeout)
+int sys_nanosleep(struct TimeSpec *timein, struct TimeSpec *timeout)
 {
     if(!timein || !timeout) return -1;
     struct Process *proc = getcpu()->cur_proc;
     lock(&proc->lock);
-    proc->t_wait = get_time() + timein->sec * TIMER_FRQ + timein->usec * TIMER_FRQ / 1000000;
+    proc->t_wait = get_time() + timein->sec * TIMER_FRQ + timein->nsec * TIMER_FRQ / 1000000000;
     proc->status = PROC_WAIT;
     move_switch2sched(proc, &wait_list);
     timeout->sec = 0;
-    timeout->usec = 0;
+    timeout->nsec = 0;
     return 0;
 }
 
@@ -574,8 +592,7 @@ uint64 sys_mmap(uint64 start, uint64 len, uint64 prot, uint64 flags, uint64 ufd,
     ufile_t *file = ufd2ufile(ufd, proc);
     if(file)
     {
-        int fd = vfs_dup((int)file->private);
-        vma->file = vfs_fd2file(fd);
+        vma->file = vfs_fd2file((int)file->private);
         vma->foff = off;
     } else
     {
@@ -600,6 +617,7 @@ int sys_munmap(void *start, int len)
 int sys_mprotect(void *addr, uint64 len, uint prot)
 {
     // printk("addr: %lx len %lx prot %lx\n", addr, len, prot);
+    return 0;
     if(!addr && !len)
     {
         addr = MAP_LOW;
@@ -664,35 +682,16 @@ int sys_getegid(void)
     return 0;
 }
 
-int sys_clock_gettime(int clockid, struct TimeVal *time)
-{
-    if(!time) return -1;
-    uint64 t = get_time();
-    struct Process *proc = getcpu()->cur_proc;
-
-    if (clockid == CLOCK_PROCESS_CPUTIME_ID || clockid == CLOCK_THREAD_CPUTIME_ID)
-        t = t - proc->start_time;
-
-    // time->sec = t / TIMER_FRQ;
-    // time->usec = (t % TIMER_FRQ) * 1000000 / TIMER_FRQ;
-    return 0;
-}
-
 // /etc/localtime
 // /proc/mounts
 // readlinkat /proc/self/exe
-
-int sys_rt_sigaction(void)
-{
-    return 0;
-}
 
 int sys_exit_group(void)
 {
     return 0;
 }
 
-int sys_clock_gsettime(int clockid, struct TimeVal *time)
+int sys_clock_gettime(int clockid, struct TimeSpec *time)
 {
     if(!time) return -1;
     uint64 t = get_time();
@@ -700,24 +699,62 @@ int sys_clock_gsettime(int clockid, struct TimeVal *time)
 
     if (clockid == CLOCK_PROCESS_CPUTIME_ID || clockid == CLOCK_THREAD_CPUTIME_ID)
         t = t - proc->start_time;
-
-    // time->sec = t / TIMER_FRQ;
-    // time->usec = (t % TIMER_FRQ) * 1000000 / TIMER_FRQ;
+    t = proc->stime;
+    time->sec = t / TIMER_FRQ;
+    time->nsec = (t % TIMER_FRQ) * 1000000000 / TIMER_FRQ; // 注意这里返回的是纳秒而不是微秒
     return 0;
 }
 
-int sys_clock_nanosleep(int clockid, int flags, struct TimeVal *request, struct TimeVal *remain)
+int sys_clock_nanosleep(int clockid, int flags, struct TimeSpec *request, struct TimeSpec *remain)
 {
     if(!request || !remain) return -1;
-    sys_exit(0);
     struct Process *proc = getcpu()->cur_proc;
     lock(&proc->lock);
-    proc->t_wait = get_time() + request->sec * TIMER_FRQ + request->usec * TIMER_FRQ / 1000000;
+    proc->t_wait = get_time() + request->sec * TIMER_FRQ + request->nsec * TIMER_FRQ / 1000000000;
     proc->status = PROC_WAIT;
     move_switch2sched(proc, &wait_list);
-    request->sec = 0;
-    request->usec = 0;
     remain->sec = 0;
-    remain->usec = 0;
+    remain->nsec = 0;
+    return 0;
+}
+
+int sys_getrusage(int who, struct rusage *usage)
+{
+    if(!usage) return -1;
+    return 0;
+    if(who == RUSAGE_SELF)
+    {
+        struct Process *proc = getcpu()->cur_proc;
+        usage->ru_utime.sec = proc->utime / TIMER_FRQ;
+        usage->ru_utime.usec = (proc->utime % TIMER_FRQ) * 1000000 / TIMER_FRQ;
+        usage->ru_stime.sec = proc->stime / TIMER_FRQ;
+        usage->ru_stime.usec = (proc->stime % TIMER_FRQ) * 1000000 / TIMER_FRQ;
+
+        return 0;
+    }
+
+    return -1;
+}
+
+int sys_kill(int pid, int signo)
+{
+    struct Process *proc = get_proc_by_pid(pid);
+    if(!proc) return -1;
+    send_signal(proc, signo);
+
+    if(signo == SIGKILL || signo == SIGTERM)
+        proc->receive_kill++;
+    
+    if(proc->status == PROC_SLEEP)
+    {
+        lock(&list_lock);
+        lock(&proc->lock);
+        proc->data = 0;
+        proc->status = PROC_READY;
+        del_list(&proc->status_list_node);
+        add_after(&ready_list, &proc->status_list_node); // 加到头优先被调度
+        unlock(&proc->lock);
+        unlock(&list_lock);
+    }
     return 0;
 }

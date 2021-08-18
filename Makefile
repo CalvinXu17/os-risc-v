@@ -16,15 +16,16 @@ KLFLAGS = $(LFLAGS)
 all: k210
 	cp ./build/k210.bin ./k210.bin
 
-qemu: KCFLAGS += -D_QEMU # -D_STRACE -D_DEBUG
+qemu: KCFLAGS += -D_QEMU #-D_STRACE # -D_DEBUG
 qemu: KLFLAGS += -T ./qemu.ld
-k210: KCFLAGS += -D_K210 # -D_STRACE -D_DEBUG
+k210: KCFLAGS += -D_K210 #-D_STRACE # -D_DEBUG
 k210: KLFLAGS += -T ./k210.ld
 
 buildos:
 	$(CC) $(KCFLAGS) -c -o $(BUILD)boot.o ./os/kernel/boot.S
 	$(CC) $(KCFLAGS) -c -o $(BUILD)intr_s.o ./os/kernel/intr.S
 	$(CC) $(KCFLAGS) -c -o $(BUILD)intr.o ./os/kernel/intr.c
+	$(CC) $(KCFLAGS) -S -o $(BUILD)intrS.S ./os/kernel/intr.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)timer.o ./os/kernel/timer.c
 
 	$(CC) $(KCFLAGS) -c -o $(BUILD)switch.o ./os/kernel/switch.S
@@ -32,6 +33,7 @@ buildos:
 	$(CC) $(KCFLAGS) -c -o $(BUILD)process.o ./os/kernel/process.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)procsyscall.o ./os/kernel/procsyscall.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)syscall.o ./os/kernel/syscall.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)signal.o ./os/kernel/signal.c
 
 	$(CC) $(KCFLAGS) -c -o $(BUILD)cpu.o ./os/kernel/cpu.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)page.o ./os/kernel/page.c
@@ -73,6 +75,7 @@ k210: buildos
 	$(CC) $(KCFLAGS) -c -o $(BUILD)gpiohs.o ./os/driver/gpiohs.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)spi.o ./os/driver/spi.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)utils.o ./os/driver/utils.c
+	$(CC) $(KCFLAGS) -c -o $(BUILD)sysctl.o ./os/driver/sysctl.c
 	$(CC) $(KCFLAGS) -c -o $(BUILD)sdcard.o ./os/driver/sdcard.c
 
 	$(CC) $(KLFLAGS) -o $(BUILD)kernel $(BUILD)boot.o \
@@ -84,6 +87,7 @@ k210: buildos
 									   $(BUILD)process.o \
 									   $(BUILD)procsyscall.o \
 									   $(BUILD)syscall.o \
+									   $(BUILD)signal.o \
 									   $(BUILD)cpu.o \
 									   $(BUILD)page.o \
 									   $(BUILD)slob.o \
@@ -101,6 +105,7 @@ k210: buildos
 									   $(BUILD)gpiohs.o \
 									   $(BUILD)spi.o \
 									   $(BUILD)utils.o \
+									   $(BUILD)sysctl.o \
 									   $(BUILD)sdcard.o \
 									   \
 									   \
@@ -148,6 +153,7 @@ qemu: buildos builduser
 									   $(BUILD)process.o \
 									   $(BUILD)procsyscall.o \
 									   $(BUILD)syscall.o \
+									   $(BUILD)signal.o \
 									   $(BUILD)cpu.o \
 									   $(BUILD)page.o \
 									   $(BUILD)slob.o \
@@ -187,7 +193,7 @@ qemu: buildos builduser
 	$(NM) $(BUILD)/kernel | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)'| sort > ./kernel.map
 	-sudo umount /mnt/vdisk
 	rm -f ./disk.img
-	dd if=/dev/zero of=disk.img bs=1024k count=64
+	dd if=/dev/zero of=disk.img bs=1024k count=500
 	mkfs.vfat -F 32 disk.img
 	sudo mount -o loop ./disk.img  /mnt/vdisk
 	sudo cp -r /home/calvin/vdisk/* /mnt/vdisk/
@@ -197,7 +203,7 @@ qemu: buildos builduser
 				-smp 2 \
 				-m 64M \
 				-nographic \
-				-bios default \
+				-bios ./sbi/qemu/rustsbi-qemu.bin \
 				-kernel $(BUILD)kernel.bin \
 				-drive file=disk.img,if=none,format=raw,id=x0 \
 				-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \

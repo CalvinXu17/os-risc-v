@@ -2,17 +2,21 @@
 
 #ifdef _K210
 #include "sdcard.h"
+#include "spinlock.h"
 extern SD_CardInfo cardinfo;
+spinlock sd_lock;
 #else
 #include "vdisk.h"
 #endif
 
 volatile int is_sd_init = 0;
+
 int hal_sd_init(hal_sd_t *sd)
 {
     if(is_sd_init) return 0;
     is_sd_init = 1;
     #ifdef _K210
+    init_spinlock(&sd_lock, "sd_lock");
     if(!sdcard_init())
     {
         return 0;
@@ -25,10 +29,12 @@ int hal_sd_init(hal_sd_t *sd)
 int hal_sd_read(hal_sd_t *sd, uchar *buf, uint32 start_sector, uint32 nsectors)
 {
     #ifdef _K210
-    if(!sd_read_sector(buf, start_sector, nsectors))
-    {
-        return 0;
-    } else return 1;
+    lock(&sd_lock);
+    int rt = 0;
+    if(sd_read_sector(buf, start_sector, nsectors))
+        rt = 1;
+    unlock(&sd_lock);
+    return rt;
     #else
     return vdisk_read(buf, start_sector, nsectors);
     #endif
@@ -37,10 +43,14 @@ int hal_sd_read(hal_sd_t *sd, uchar *buf, uint32 start_sector, uint32 nsectors)
 int hal_sd_write(hal_sd_t *sd, const uchar *buf, uint32 start_sector, uint32 nsectors)
 {
     #ifdef _K210
-    if(!sd_write_sector(buf, start_sector, nsectors))
+    lock(&sd_lock);
+    int rt = 0;
+    if(sd_write_sector(buf, start_sector, nsectors))
     {
-        return 0;
-    } else return 1;
+        rt = 1;
+    }
+    unlock(&sd_lock);
+    return rt;
     #else
     return vdisk_write(buf, start_sector, nsectors);
     #endif

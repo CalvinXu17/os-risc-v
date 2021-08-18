@@ -47,6 +47,8 @@ int vfs_open(const char *pathname, vfs_oflag_t flags)
     } else if (VFS_INODE_IS_CHAR_DEVICE(inode)) {
         if (inode->ops.cd_ops->open) {
             ret = inode->ops.cd_ops->open(file);
+            strcpy(file->relative_path, pathname);
+            file->relative_path[strlen(pathname)] = '\0';
         }
     } else {
         goto errout1;

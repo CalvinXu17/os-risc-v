@@ -7,5 +7,5 @@ NM  = /opt/kendryte-toolchain/bin/riscv64-unknown-elf-nm
 OBJCOPY = /opt/kendryte-toolchain/bin/riscv64-unknown-elf-objcopy
 STRIP = /opt/kendryte-toolchain/bin/riscv64-unknown-elf-strip
 
-LFLAGS = -mcmodel=medany -march=rv64imac -mabi=lp64
-CFLAGS = -mcmodel=medany -march=rv64imac -mabi=lp64
+LFLAGS = -mcmodel=medany -march=rv64imafdc -mabi=lp64
+CFLAGS = -mcmodel=medany -march=rv64imafdc -mabi=lp64

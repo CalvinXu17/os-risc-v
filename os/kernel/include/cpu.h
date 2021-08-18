@@ -123,12 +123,7 @@ static inline uint64 get_mcause(void)
 //                  : "r"(x));
 // }
 
-static inline uint64 get_time(void)
-{
-    register uint64 rt asm("a0");
-    asm volatile("csrr %0, time" : "=r"(rt));
-    return rt;
-}
+uint64 get_time(void);
 
 
 // supervisor mode
@@ -319,9 +314,19 @@ struct cpu
 #define CPU_N   2
 extern struct cpu cpus[CPU_N];
 
-struct cpu* getcpu(void);
-uint64 gethartid(void);
+static inline struct cpu* getcpu(void) __attribute__((always_inline));;
+static inline uint64 gethartid(void) __attribute__((always_inline));;
 void cpu_init(uint64 hartid);
+
+static inline struct cpu* getcpu(void)
+{
+    return &(cpus[get_tp()]);
+}
+
+static inline uint64 gethartid(void)
+{
+    return get_tp();
+}
 
 #define M_MODE  0
 #define S_MODE  1
@@ -335,6 +340,8 @@ void cpu_init(uint64 hartid);
 #define SSIE    (1L << 1)
 #define STIE    (1L << 5)
 #define SEIE    (1L << 9)
+
+#define SFS     (0x00006000)
 
 #define PTE_V (1L << 0)
 #define PTE_R (1L << 1)

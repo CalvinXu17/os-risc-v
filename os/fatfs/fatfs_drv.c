@@ -32,18 +32,9 @@ static uint64 sd_read(vfs_inode_t *dev, void *buf, uint64 start_sector, unsigned
     uint32 i;
     uchar *buff = (uchar *)buf;
     #ifdef _K210
-    if ((uint64)buff % 4 != 0) {
-        for (i = 0; i < nsectors; ++i) {
-            rc = hal_sd_read(&sd, sdio_aligned_buffer, start_sector + i, 1);
-            memcpy(buff, sdio_aligned_buffer, 512);
-            buff += 512;
-        }
-    } else {
-        for (i = 0; i < nsectors; ++i) {
-            rc = hal_sd_read(&sd, buff, start_sector + i, 1);
-            buff += 512;
-        }
-    }
+
+    rc = hal_sd_read(&sd, buff, start_sector, nsectors);
+    return rc;
     #else
     for (i = 0; i < nsectors; ++i)
     {
@@ -60,7 +51,10 @@ static uint64 sd_write(vfs_inode_t *dev, const unsigned char *buf, uint64 start_
     int rc = 0;
     uint32 i;
     uchar *buff = (uchar *)buf;
+
     #ifdef _K210
+    rc = hal_sd_write(&sd, buff, start_sector, nsectors);
+    return rc;
     if ((uint64)buff % 4 != 0) {
         for (i = 0; i < nsectors; ++i) {
             memcpy(sdio_aligned_buffer, buff, 512);

@@ -29,11 +29,11 @@ typedef union vfs_inode_operations_un {
 #define VFS_INODE_IS_FILESYSTEM(inode)      VFS_INODE_IS_TYPE(inode, VFS_INODE_TYPE_FILESYSTEM)
 #define VFS_INODE_IS_DEVICE(inode)          (VFS_INODE_IS_BLOCK_DEVICE(inode) || VFS_INODE_IS_CHAR_DEVICE(inode))
 
-#define VFS_INODE_REFS_MAX                  (0x3F)
+#define VFS_INODE_REFS_MAX                  (0x3fffffff)
 
 typedef struct vfs_inode_st {
     uchar               type : 2; /*< now we only support three kind of inode */
-    uchar               refs : 6; /*< max 0x3F */
+    uint32              refs; /*< max 0x3F */
     vfs_inode_ops_t     ops;
     void               *private;
     list                list;
